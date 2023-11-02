@@ -1,1 +1,0 @@
-Current PID: 0. Memory instantiation complete. OFF bits: 4. PFN bits: 6. VPN bits: 6

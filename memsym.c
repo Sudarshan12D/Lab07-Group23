@@ -7,7 +7,7 @@
 #define FALSE 0
 
 // Assuming maximum page table entries and maximum number of processes
-#define MAX_PROCESSES 10
+#define MAX_PROCESSES 4
 
 // Memory parameters
 int OFFSET_BITS = -1; 
@@ -109,9 +109,21 @@ void processCommand(char** tokens) {
         PFN_BITS = atoi(tokens[2]);
         VPN_BITS = atoi(tokens[3]);
         IS_DEFINED = TRUE;
-        
+
         fprintf(output_file, "Current PID: %d. Memory instantiation complete. OFF bits: %d. PFN bits: %d. VPN bits: %d\n", 
                 CURRENT_PID, OFFSET_BITS, PFN_BITS, VPN_BITS);
+    }
+
+    else if (tokens[0] && strcmp(tokens[0], "ctxswitch") == 0) {
+        int new_pid = atoi(tokens[1]);
+        // Check for valid PID range
+        if (new_pid >= 0 && new_pid < MAX_PROCESSES) {
+            CURRENT_PID = new_pid;
+            fprintf(output_file, "Current PID: %d. Switched execution context to process: %d\n", CURRENT_PID, CURRENT_PID);
+        } else {
+            // Output an error message for invalid PID
+            fprintf(output_file, "Current PID: %d. Invalid context switch to process %d\n", CURRENT_PID, new_pid);
+        }
     }
     // Other commands should be implemented similarly
 }
