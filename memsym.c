@@ -25,6 +25,7 @@ char* strategy;
 
 // Function prototypes
 void processCommand(char** tokens);
+int isValidRegister(const char* reg);
 
 
 
@@ -97,6 +98,13 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+int isValidRegister(const char* reg) {
+    if (reg[0] != 'r') {
+        return FALSE;
+    }
+    long regNum = strtol(&reg[1], NULL, 10);
+    return (regNum >= 0 && regNum <= 31); // Assuming registers r0 to r31 are valid
+}
 
 void processCommand(char** tokens) {
     if (tokens[0] && strcmp(tokens[0], "define") == 0) {
@@ -115,6 +123,8 @@ void processCommand(char** tokens) {
     }
 
     else if (tokens[0] && strcmp(tokens[0], "ctxswitch") == 0) {
+
+
         int new_pid = atoi(tokens[1]);
         // Check for valid PID range
         if (new_pid >= 0 && new_pid < MAX_PROCESSES) {
@@ -125,5 +135,45 @@ void processCommand(char** tokens) {
             fprintf(output_file, "Current PID: %d. Invalid context switch to process %d\n", CURRENT_PID, new_pid);
         }
     }
-    // Other commands should be implemented similarly
+
+
+    else if (tokens[0] && strcmp(tokens[0], "load") == 0) {
+
+        static int error_reported = FALSE;
+
+        if (!IS_DEFINED) {
+            if (!error_reported) { // Only print the error if it hasn't been reported already
+                fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
+                error_reported = TRUE; // Set to TRUE after reporting the error
+            }
+            return; // Early return since memory is not defined
+        }
+
+        if (tokens[1] && tokens[2]) {
+            char* dst = tokens[1]; // Destination register
+            char* src = tokens[2]; // Source operand
+            
+            if (!isValidRegister(dst)) {
+                fprintf(output_file, "Current PID: %d. Error: invalid register operand %s\n", CURRENT_PID, dst);
+                return;
+            }
+
+            if (src[0] == '#') { // Immediate value
+                // Print the loaded immediate value
+                fprintf(output_file, "Current PID: %d. Loaded immediate %s into register %s\n", CURRENT_PID, src + 1, dst);
+            } else {
+                // TODO: Implement memory location loading
+                // For now, let's just print a placeholder
+                fprintf(output_file, "Current PID: %d. Loaded value of location %s (<value>) into register %s\n", CURRENT_PID, src, dst);
+            }
+        }
+        else {
+            // Error: 'load' command requires a destination and a source operand
+            fprintf(output_file, "Error: 'load' command requires a destination and a source operand.\n");
+        }
+
+        error_reported = FALSE;
+    }
 }
+
+
