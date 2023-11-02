@@ -6,11 +6,27 @@
 #define TRUE 1
 #define FALSE 0
 
+// Assuming maximum page table entries and maximum number of processes
+#define MAX_PROCESSES 10
+
+// Memory parameters
+int OFFSET_BITS = -1; 
+int PFN_BITS = -1;
+int VPN_BITS = -1;
+int CURRENT_PID = 0;
+int IS_DEFINED = FALSE;
+
 // Output file
 FILE* output_file;
 
 // TLB replacement strategy (FIFO or LRU)
 char* strategy;
+
+
+// Function prototypes
+void processCommand(char** tokens);
+
+
 
 char** tokenize_input(char* input) {
     char** tokens = NULL;
@@ -58,10 +74,13 @@ int main(int argc, char* argv[]) {
             fprintf(stderr, "Reached end of trace. Exiting...\n");
             return -1;
         } else {
-            // Remove endline character
-            buffer[strlen(buffer) - 1] = '\0';
+            size_t len = strlen(buffer);
+            if (len > 0 && buffer[len - 1] == '\n') {
+                buffer[len - 1] = '\0';
+            }
         }
         char** tokens = tokenize_input(buffer);
+        processCommand(tokens);
 
         // TODO: Implement your memory simulator
 
@@ -76,4 +95,23 @@ int main(int argc, char* argv[]) {
     fclose(output_file);
 
     return 0;
+}
+
+
+void processCommand(char** tokens) {
+    if (tokens[0] && strcmp(tokens[0], "define") == 0) {
+        if (IS_DEFINED) {
+            // If already defined, print an error and return
+            fprintf(output_file, "Current PID: %d. Error: multiple calls to define in the same trace\n", CURRENT_PID);
+            return;
+        }
+        OFFSET_BITS = atoi(tokens[1]);
+        PFN_BITS = atoi(tokens[2]);
+        VPN_BITS = atoi(tokens[3]);
+        IS_DEFINED = TRUE;
+        
+        fprintf(output_file, "Current PID: %d. Memory instantiation complete. OFF bits: %d. PFN bits: %d. VPN bits: %d\n", 
+                CURRENT_PID, OFFSET_BITS, PFN_BITS, VPN_BITS);
+    }
+    // Other commands should be implemented similarly
 }
