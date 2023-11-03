@@ -8,6 +8,19 @@
 
 // Assuming maximum page table entries and maximum number of processes
 #define MAX_PROCESSES 4
+#define MAX_REGISTERS 32
+
+
+int registers[MAX_REGISTERS] = {0};
+
+
+// Define a process context structure
+typedef struct {
+    int registers[MAX_REGISTERS];
+} ProcessContext;
+
+
+ProcessContext processContexts[MAX_PROCESSES];
 
 // Memory parameters
 int OFFSET_BITS = -1; 
@@ -106,6 +119,21 @@ int isValidRegister(const char* reg) {
     return (regNum >= 0 && regNum <= 31); // Assuming registers r0 to r31 are valid
 }
 
+
+void contextSwitch(int new_pid) {
+    // Save current process context
+    memcpy(processContexts[CURRENT_PID].registers, registers, sizeof(registers));
+
+    // Switch to new process
+    CURRENT_PID = new_pid;
+
+    // Restore new process context
+    memcpy(registers, processContexts[CURRENT_PID].registers, sizeof(registers));
+
+    fprintf(output_file, "Current PID: %d. Switched execution context to process: %d\n", CURRENT_PID, CURRENT_PID);
+}
+
+
 void processCommand(char** tokens) {
     if (tokens[0] && strcmp(tokens[0], "define") == 0) {
         if (IS_DEFINED) {
@@ -128,8 +156,7 @@ void processCommand(char** tokens) {
         int new_pid = atoi(tokens[1]);
         // Check for valid PID range
         if (new_pid >= 0 && new_pid < MAX_PROCESSES) {
-            CURRENT_PID = new_pid;
-            fprintf(output_file, "Current PID: %d. Switched execution context to process: %d\n", CURRENT_PID, CURRENT_PID);
+            contextSwitch(new_pid);
         } else {
             // Output an error message for invalid PID
             fprintf(output_file, "Current PID: %d. Invalid context switch to process %d\n", CURRENT_PID, new_pid);
@@ -159,12 +186,19 @@ void processCommand(char** tokens) {
             }
 
             if (src[0] == '#') { // Immediate value
-                // Print the loaded immediate value
-                fprintf(output_file, "Current PID: %d. Loaded immediate %s into register %s\n", CURRENT_PID, src + 1, dst);
-            } else {
-                // TODO: Implement memory location loading
-                // For now, let's just print a placeholder
-                fprintf(output_file, "Current PID: %d. Loaded value of location %s (<value>) into register %s\n", CURRENT_PID, src, dst);
+                
+                int regIndex = atoi(dst + 1); // Get the register index, assuming 'rX' format
+                int value = atoi(src + 1);    // Get the immediate value
+                if (regIndex >= 0 && regIndex < MAX_REGISTERS) {
+                    registers[regIndex] = value;
+                    fprintf(output_file, "Current PID: %d. Loaded immediate %s into register %s\n", CURRENT_PID, src + 1, dst);
+                }
+
+                else {
+                    // TODO: Implement memory location loading
+                    // For now, let's just print a placeholder
+                    fprintf(output_file, "Current PID: %d. Loaded value of location %s (<value>) into register %s\n", CURRENT_PID, src, dst);
+                }
             }
         }
         else {
@@ -173,6 +207,23 @@ void processCommand(char** tokens) {
         }
 
         error_reported = FALSE;
+    }
+
+   else if (tokens[0] && strcmp(tokens[0], "add") == 0) {
+    if (!IS_DEFINED) {
+        fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
+        return;
+    }
+
+    // Store the initial value of r1 before performing the addition
+    int initial_r1_value = registers[1];
+
+    // Assuming the 'add' instruction adds the contents of r1 and r2 and stores the result in r1
+    int sum = initial_r1_value + registers[2];
+    registers[1] = sum; // Store the result back in r1
+
+    fprintf(output_file, "Current PID: %d. Added contents of registers r1 (%d) and r2 (%d). Result: %d\n",
+            CURRENT_PID, initial_r1_value, registers[2], sum);
     }
 }
 
