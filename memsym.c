@@ -33,7 +33,7 @@ int PFN_BITS = -1;
 int VPN_BITS = -1;
 int CURRENT_PID = 0;
 int IS_DEFINED = FALSE;
-u_int32_t counter = 0;
+int32_t counter = -1;
 
 uint32_t *physicalMemory;
 
@@ -167,51 +167,43 @@ void contextSwitch(int new_pid) {
 
 void map2TLB(int VPN, int PFN)
 {
-    // Check to see if tlb already contains entry
-    for (int i = 0; i < TLB_SIZE; i++)
-    {
-        if (tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
-        {
-            tlb[i].validBit = 1;
+    
+    for (int i = 0; i < TLB_SIZE; i++) {
+        if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID) {
             tlb[i].PFN = PFN;
             tlb[i].timestamp = counter;
+            return;
         }
     }
 
-    // If tlb does not contain entry, then find first invalid entry and set values there
-    for (int i = 0; i < TLB_SIZE; i++)
-    {
-        if (tlb[i].validBit == 0)
-        {
+    // Look for an empty slot
+    for (int i = 0; i < TLB_SIZE; i++) {
+        if (!tlb[i].validBit) {
             tlb[i].pid = CURRENT_PID;
-            tlb[i].PFN = PFN;
             tlb[i].VPN = VPN;
+            tlb[i].PFN = PFN;
             tlb[i].validBit = 1;
             tlb[i].timestamp = counter;
             return;
         }
     }
 
-    // initialize minimum timestamp
-    int minTimestamp = tlb[0].timestamp;
-    int minTimestampIndex = 0;
-
-    // search tlb for minimum timestamp
-    for (int i = 0; i < TLB_SIZE; i++)
-    {
-        if (tlb[i].timestamp < minTimestamp)
-        {
-            minTimestamp = tlb[i].timestamp;
-            minTimestampIndex = i;
+    // Apply FIFO replacement
+    int oldestIndex = 0;
+    uint32_t oldestTimestamp = tlb[0].timestamp;
+    for (int i = 1; i < TLB_SIZE; i++) {
+        if (tlb[i].timestamp < oldestTimestamp) {
+            oldestTimestamp = tlb[i].timestamp;
+            oldestIndex = i;
         }
     }
 
-    // set new values
-    tlb[minTimestampIndex].pid = CURRENT_PID;
-    tlb[minTimestampIndex].VPN = VPN;
-    tlb[minTimestampIndex].PFN = PFN;
-    tlb[minTimestampIndex].validBit = 1;
-    tlb[minTimestampIndex].timestamp = counter;
+    // Replace the oldest entry
+    tlb[oldestIndex].pid = CURRENT_PID;
+    tlb[oldestIndex].VPN = VPN;
+    tlb[oldestIndex].PFN = PFN;
+    tlb[oldestIndex].validBit = 1;
+    tlb[oldestIndex].timestamp = counter;
 
     return;
 }
@@ -520,6 +512,26 @@ void processCommand(char** tokens) {
             fprintf(output_file, "Error: 'linspect' command requires a physical memory address.\n");
         }
     }
+
+    else if (tokens[0] && strcmp(tokens[0], "tinspect") == 0) {
+    if (!IS_DEFINED) {
+        fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
+        return;
+    }
+
+    if (tokens[1]) {
+        int tlbIndex = atoi(tokens[1]);
+        if (tlbIndex >= 0 && tlbIndex < TLB_SIZE) {
+            TLBEntry entry = tlb[tlbIndex];
+            fprintf(output_file, "Current PID: %d. Inspected TLB entry %d. VPN: %d. PFN: %d. Valid: %d. PID: %d. Timestamp: %u\n",
+                    CURRENT_PID, tlbIndex, entry.VPN, entry.PFN, entry.validBit, entry.pid, entry.timestamp);
+        } else {
+            fprintf(output_file, "Error: Invalid TLB entry index %d\n", tlbIndex);
+        }
+    } else {
+        fprintf(output_file, "Error: 'tinspect' command requires a TLB entry index.\n");
+    }
+}
 }
 
 

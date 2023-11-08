@@ -24,6 +24,30 @@ Current PID: 2. Translating. Lookup for VPN 6 hit in TLB entry 6. PFN is 16
 Current PID: 2. Stored immediate 16 into location 48
 Current PID: 2. Translating. Lookup for VPN 7 hit in TLB entry 7. PFN is 17
 Current PID: 2. Stored immediate 17 into location 56
+Current PID: 2. Inspected TLB entry 0. VPN: 0. PFN: 10. Valid: 1. PID: 2. Timestamp: 3
+Current PID: 2. Inspected TLB entry 1. VPN: 1. PFN: 11. Valid: 1. PID: 2. Timestamp: 4
+Current PID: 2. Inspected TLB entry 2. VPN: 2. PFN: 12. Valid: 1. PID: 2. Timestamp: 5
+Current PID: 2. Inspected TLB entry 3. VPN: 3. PFN: 13. Valid: 1. PID: 2. Timestamp: 6
+Current PID: 2. Inspected TLB entry 4. VPN: 4. PFN: 14. Valid: 1. PID: 2. Timestamp: 7
+Current PID: 2. Inspected TLB entry 5. VPN: 5. PFN: 15. Valid: 1. PID: 2. Timestamp: 8
+Current PID: 2. Inspected TLB entry 6. VPN: 6. PFN: 16. Valid: 1. PID: 2. Timestamp: 9
+Current PID: 2. Inspected TLB entry 7. VPN: 7. PFN: 17. Valid: 1. PID: 2. Timestamp: 10
 Current PID: 2. Translating. Lookup for VPN 0 hit in TLB entry 0. PFN is 10
 Current PID: 2. Stored immediate 11 into location 0
+Current PID: 2. Inspected TLB entry 0. VPN: 0. PFN: 10. Valid: 1. PID: 2. Timestamp: 3
+Current PID: 2. Inspected TLB entry 1. VPN: 1. PFN: 11. Valid: 1. PID: 2. Timestamp: 4
+Current PID: 2. Inspected TLB entry 2. VPN: 2. PFN: 12. Valid: 1. PID: 2. Timestamp: 5
+Current PID: 2. Inspected TLB entry 3. VPN: 3. PFN: 13. Valid: 1. PID: 2. Timestamp: 6
+Current PID: 2. Inspected TLB entry 4. VPN: 4. PFN: 14. Valid: 1. PID: 2. Timestamp: 7
+Current PID: 2. Inspected TLB entry 5. VPN: 5. PFN: 15. Valid: 1. PID: 2. Timestamp: 8
+Current PID: 2. Inspected TLB entry 6. VPN: 6. PFN: 16. Valid: 1. PID: 2. Timestamp: 9
+Current PID: 2. Inspected TLB entry 7. VPN: 7. PFN: 17. Valid: 1. PID: 2. Timestamp: 10
 Current PID: 2. Mapped virtual page number 8 to physical frame number 18
+Current PID: 2. Inspected TLB entry 0. VPN: 8. PFN: 18. Valid: 1. PID: 2. Timestamp: 36
+Current PID: 2. Inspected TLB entry 1. VPN: 1. PFN: 11. Valid: 1. PID: 2. Timestamp: 4
+Current PID: 2. Inspected TLB entry 2. VPN: 2. PFN: 12. Valid: 1. PID: 2. Timestamp: 5
+Current PID: 2. Inspected TLB entry 3. VPN: 3. PFN: 13. Valid: 1. PID: 2. Timestamp: 6
+Current PID: 2. Inspected TLB entry 4. VPN: 4. PFN: 14. Valid: 1. PID: 2. Timestamp: 7
+Current PID: 2. Inspected TLB entry 5. VPN: 5. PFN: 15. Valid: 1. PID: 2. Timestamp: 8
+Current PID: 2. Inspected TLB entry 6. VPN: 6. PFN: 16. Valid: 1. PID: 2. Timestamp: 9
+Current PID: 2. Inspected TLB entry 7. VPN: 7. PFN: 17. Valid: 1. PID: 2. Timestamp: 10
