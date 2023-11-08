@@ -43,6 +43,7 @@ typedef struct
     int pid;
     int validBit;
     int PFN;
+    int VPN;
 } PageTableEntry;
 
 typedef struct
@@ -53,7 +54,7 @@ typedef struct
     int validBit;
 } TLBEntry;
 
-TLBEntry tlb[TLB_SIZE]; // Fixed TLB of 8 entries
+TLBEntry *tlb; // Fixed TLB of 8 entries
 PageTableEntry **pageTables;
 
 // Function prototypes
@@ -179,9 +180,13 @@ void processCommand(char **tokens)
         IS_DEFINED = TRUE;
 
         // Initialize TLB entries as invalid
+        tlb = (TLBEntry *)malloc(TLB_SIZE * sizeof(TLBEntry));
         for (int i = 0; i < TLB_SIZE; i++)
         {
             tlb[i].validBit = 0;
+            tlb[i].PFN = 0;
+            tlb[i].VPN = 0;
+            tlb[i].pid = 0;
         }
 
         pageTables = (PageTableEntry **)malloc(PAGETABLE_SIZE * sizeof(PageTableEntry *));
@@ -189,19 +194,20 @@ void processCommand(char **tokens)
         // Initialize page table entries as invalid
         for (int i = 0; i < PAGETABLE_SIZE; i++)
         {
-            pageTables[i] = (PageTableEntry *)malloc((1 << VPN_BITS) * sizeof(PageTableEntry));
-            for (int j = 0; j < (1 << VPN_BITS); j++)
+            pageTables[i] = (PageTableEntry *)malloc(pow(2, VPN_BITS) * sizeof(PageTableEntry));
+            for (int j = 0; j < pow(2, VPN_BITS); j++)
             {
                 pageTables[i][j].validBit = 0;
                 pageTables[i][j].pid = i;
+                pageTables[i][j].VPN = j;
+                pageTables[i][j].PFN = 0;
             }
         }
 
-        int memorySize = (1 << (OFFSET_BITS + PFN_BITS)) * sizeof(uint32_t);
-        physicalMemory = (uint32_t *)malloc(memorySize);
+        physicalMemory = (uint32_t *)malloc(pow(2, OFFSET_BITS + PFN_BITS) * sizeof(u_int32_t));
 
         // Initialize all locations to 0
-        for (int i = 0; i < (1 << (OFFSET_BITS + PFN_BITS)); i++)
+        for (int i = 0; i < pow(2, OFFSET_BITS + PFN_BITS); i++)
         {
             physicalMemory[i] = 0;
         }
@@ -318,25 +324,9 @@ void processCommand(char **tokens)
             int VPN = atoi(tokens[1]);
             int PFN = atoi(tokens[2]);
 
-            if (VPN >= 0 && VPN < (1 << VPN_BITS) && PFN >= 0 && PFN < (1 << PFN_BITS))
+            if (VPN >= 0 && VPN < pow(2, VPN) && PFN >= 0 && PFN < pow(2, PFN))
             {
                 // Update TLB
-                int i = 0;
-                while (i < TLB_SIZE)
-                {
-                    if ((tlb[i].pid == NULL) || (tlb[i].VPN != NULL))
-                    {
-                        tlb[i].pid = CURRENT_PID;
-                        tlb[i].VPN = VPN;
-                        tlb[i].PFN = PFN;
-                        tlb[i].validBit = 1;
-                        break;
-                    }
-                    else
-                    {
-                        i++;
-                    }
-                }
 
                 // Update page table
                 pageTables[CURRENT_PID][VPN].PFN = PFN;
