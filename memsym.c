@@ -165,48 +165,38 @@ void contextSwitch(int new_pid) {
     fprintf(output_file, "Current PID: %d. Switched execution context to process: %d\n", CURRENT_PID, CURRENT_PID);
 }
 
-void map2TLB(int VPN, int PFN)
-{
-    
+
+void map2TLB(int VPN, int PFN) {
+    int replacementIndex = -1;
+    uint32_t oldestTimestamp = UINT32_MAX;
+    int foundEmptySlot = FALSE;
+
+    // Search for existing entry or the first empty slot
     for (int i = 0; i < TLB_SIZE; i++) {
         if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID) {
             tlb[i].PFN = PFN;
-            tlb[i].timestamp = counter;
+            tlb[i].timestamp = counter; // Update timestamp on hit
             return;
         }
-    }
-
-    // Look for an empty slot
-    for (int i = 0; i < TLB_SIZE; i++) {
-        if (!tlb[i].validBit) {
-            tlb[i].pid = CURRENT_PID;
-            tlb[i].VPN = VPN;
-            tlb[i].PFN = PFN;
-            tlb[i].validBit = 1;
-            tlb[i].timestamp = counter;
-            return;
+        if (!tlb[i].validBit && !foundEmptySlot) {
+            replacementIndex = i; // First empty slot
+            foundEmptySlot = TRUE;
         }
-    }
-
-    // Apply FIFO replacement
-    int oldestIndex = 0;
-    uint32_t oldestTimestamp = tlb[0].timestamp;
-    for (int i = 1; i < TLB_SIZE; i++) {
-        if (tlb[i].timestamp < oldestTimestamp) {
+        else if (tlb[i].validBit && tlb[i].timestamp < oldestTimestamp) {
             oldestTimestamp = tlb[i].timestamp;
-            oldestIndex = i;
+            replacementIndex = i; // Oldest entry for replacement
         }
     }
 
-    // Replace the oldest entry
-    tlb[oldestIndex].pid = CURRENT_PID;
-    tlb[oldestIndex].VPN = VPN;
-    tlb[oldestIndex].PFN = PFN;
-    tlb[oldestIndex].validBit = 1;
-    tlb[oldestIndex].timestamp = counter;
-
-    return;
+    // Replace the chosen entry
+    tlb[replacementIndex].pid = CURRENT_PID;
+    tlb[replacementIndex].VPN = VPN;
+    tlb[replacementIndex].PFN = PFN;
+    tlb[replacementIndex].validBit = 1;
+    tlb[replacementIndex].timestamp = counter; // Update timestamp for new or replaced entry
 }
+
+
 
 int translateAddress(int virtualAddr) {
     int VPN = virtualAddr / pow(2, OFFSET_BITS); // Calculate the VPN from the virtual address
@@ -403,16 +393,13 @@ void processCommand(char** tokens) {
         }
 
         int VPN = atoi(tokens[1]);
+        if (VPN >= 0 && VPN < pow(2, VPN_BITS)) {
 
-        if (VPN >= 0 && VPN < pow(2, VPN_BITS))
-        {
-            for (int i = 0; i < TLB_SIZE; i++)
-            {
-                if (tlb[i].pid == CURRENT_PID && tlb[i].VPN == VPN)
-                {
-                    // Found a mapping in TLB, invalidate it
-                    tlb[i].validBit = 0;
-                    //break;
+            for (int i = 0; i < TLB_SIZE; i++) {
+
+                if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID) {
+                    
+                    tlb[i].validBit = 0; // Invalidate TLB entry
                 }
             }
 
@@ -514,24 +501,22 @@ void processCommand(char** tokens) {
     }
 
     else if (tokens[0] && strcmp(tokens[0], "tinspect") == 0) {
-    if (!IS_DEFINED) {
-        fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
-        return;
-    }
-
-    if (tokens[1]) {
-        int tlbIndex = atoi(tokens[1]);
-        if (tlbIndex >= 0 && tlbIndex < TLB_SIZE) {
-            TLBEntry entry = tlb[tlbIndex];
-            fprintf(output_file, "Current PID: %d. Inspected TLB entry %d. VPN: %d. PFN: %d. Valid: %d. PID: %d. Timestamp: %u\n",
-                    CURRENT_PID, tlbIndex, entry.VPN, entry.PFN, entry.validBit, entry.pid, entry.timestamp);
-        } else {
-            fprintf(output_file, "Error: Invalid TLB entry index %d\n", tlbIndex);
+        if (!IS_DEFINED) {
+            fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
+            return;
         }
-    } else {
-        fprintf(output_file, "Error: 'tinspect' command requires a TLB entry index.\n");
+
+        if (tokens[1]) {
+            int tlbIndex = atoi(tokens[1]);
+            if (tlbIndex >= 0 && tlbIndex < TLB_SIZE) {
+                TLBEntry entry = tlb[tlbIndex];
+                fprintf(output_file, "Current PID: %d. Inspected TLB entry %d. VPN: %d. PFN: %d. Valid: %d. PID: %d. Timestamp: %u\n",
+                        CURRENT_PID, tlbIndex, entry.VPN, entry.PFN, entry.validBit, entry.pid, entry.timestamp);
+            } else {
+                fprintf(output_file, "Error: Invalid TLB entry index %d\n", tlbIndex);
+            }
+        } else {
+            fprintf(output_file, "Error: 'tinspect' command requires a TLB entry index.\n");
+        }
     }
 }
-}
-
-
