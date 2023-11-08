@@ -437,4 +437,13 @@ void processCommand(char **tokens)
         }
         // Other commands should be implemented similarly
     }
+
+    else if (tokens[0] && strcmp(tokens[0], "load") == 0)
+    {
+        if (!IS_DEFINED)
+        {
+            fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
+            return;
+        }
+    }
 }
