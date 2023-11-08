@@ -407,6 +407,34 @@ void processCommand(char **tokens)
             fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
             return;
         }
+
+        int VPN = atoi(tokens[1]);
+
+        if (VPN >= 0 && VPN < pow(2, VPN_BITS))
+        {
+            for (int i = 0; i < TLB_SIZE; i++)
+            {
+                if (tlb[i].pid == CURRENT_PID && tlb[i].VPN == VPN)
+                {
+                    // Found a mapping in TLB, invalidate it
+                    tlb[i].validBit = 0;
+                    break;
+                }
+            }
+
+            // Check page table for the mapping
+            if (pageTables[CURRENT_PID][VPN].validBit)
+            {
+                // Found a mapping in page table, invalidate it
+                pageTables[CURRENT_PID][VPN].validBit = 0;
+            }
+
+            fprintf(output_file, "Current PID: %d. Unmapped virtual page number %d\n", CURRENT_PID, VPN);
+        }
+        else
+        {
+            fprintf(output_file, "Error: Invalid VPN\n");
+        }
+        // Other commands should be implemented similarly
     }
-    // Other commands should be implemented similarly
 }
