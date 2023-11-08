@@ -30,6 +30,7 @@ int PFN_BITS = -1;
 int VPN_BITS = -1;
 int CURRENT_PID = 0;
 int IS_DEFINED = FALSE;
+u_int32_t counter = 0;
 
 uint32_t *physicalMemory;
 
@@ -50,6 +51,7 @@ typedef struct
 typedef struct
 {
     int pid;
+    uint32_t timestamp;
     int PFN;
     int VPN;
     int validBit;
@@ -137,6 +139,10 @@ int main(int argc, char *argv[])
     fclose(input_file);
     fclose(output_file);
 
+    free(physicalMemory);
+    free(tlb);
+    free(pageTables);
+
     return 0;
 }
 
@@ -164,8 +170,61 @@ void contextSwitch(int new_pid)
     fprintf(output_file, "Current PID: %d. Switched execution context to process: %d\n", CURRENT_PID, CURRENT_PID);
 }
 
+void map2TLB(int VPN, int PFN)
+{
+    // Check to see if tlb already contains entry
+    for (int i = 0; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
+        {
+            tlb[i].validBit = 1;
+            tlb[i].PFN = PFN;
+            tlb[i].timestamp = counter;
+        }
+    }
+
+    // If tlb does not contain entry, then find first invalid entry and set values there
+    for (int i = 0; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].validBit == 0)
+        {
+            tlb[i].pid = CURRENT_PID;
+            tlb[i].PFN = PFN;
+            tlb[i].VPN = VPN;
+            tlb[i].validBit = 1;
+            tlb[i].timestamp = counter;
+            return;
+        }
+    }
+
+    // initialize minimum timestamp
+    int minTimestamp = tlb[0].timestamp;
+    int minTimestampIndex = 0;
+
+    // search tlb for minimum timestamp
+    for (int i = 0; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].timestamp < minTimestamp)
+        {
+            minTimestamp = tlb[i].timestamp;
+            minTimestampIndex = i;
+        }
+    }
+
+    // set new values
+    tlb[minTimestampIndex].pid = CURRENT_PID;
+    tlb[minTimestampIndex].VPN = VPN;
+    tlb[minTimestampIndex].PFN = PFN;
+    tlb[minTimestampIndex].validBit = 1;
+    tlb[minTimestampIndex].timestamp = counter;
+
+    return;
+}
+
 void processCommand(char **tokens)
 {
+    counter++;
+
     if (tokens[0] && strcmp(tokens[0], "define") == 0)
     {
         if (IS_DEFINED)
@@ -320,51 +379,33 @@ void processCommand(char **tokens)
             return;
         }
 
-        if (tokens[1] && tokens[2])
+        int VPN = atoi(tokens[1]);
+        int PFN = atoi(tokens[2]);
+
+        if ((VPN >= 0 && VPN < pow(2, VPN_BITS)) && (PFN >= 0 && PFN < pow(2, PFN_BITS)))
         {
-            int VPN = atoi(tokens[1]);
-            int PFN = atoi(tokens[2]);
+            // Update TLB
+            map2TLB(VPN, PFN);
 
-            if ((VPN >= 0 && VPN < pow(2, VPN_BITS)) && (PFN >= 0 && PFN < pow(2, PFN_BITS)))
-            {
-                // Update TLB
-                for (int i = 0; i < TLB_SIZE; i++)
-                {
-                    if (tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
-                    {
-                        tlb[i].PFN = PFN;
-                        tlb[i].validBit = 1;
-                        return;
-                    }
-                }
+            // Update page table
+            pageTables[CURRENT_PID][VPN].PFN = PFN;
+            pageTables[CURRENT_PID][VPN].validBit = 1;
+            pageTables[CURRENT_PID][VPN].VPN = VPN;
 
-                for (int i = 0; i < TLB_SIZE; i++)
-                {
-                    if (tlb[i].validBit == 0)
-                    {
-                        tlb[i].PFN = PFN;
-                        tlb[i].validBit = 1;
-                        tlb[i].VPN = VPN;
-                        tlb[i].pid = CURRENT_PID;
-                        return;
-                    }
-                }
-
-                // Update page table
-                pageTables[CURRENT_PID][VPN].PFN = PFN;
-                pageTables[CURRENT_PID][VPN].validBit = 1;
-                pageTables[CURRENT_PID][VPN].VPN = VPN;
-
-                fprintf(output_file, "Current PID: %d. Mapped virtual page number %d to physical frame number %d\n", CURRENT_PID, VPN, PFN);
-            }
-            else
-            {
-                fprintf(output_file, "Error: Invalid VPN or PFN\n");
-            }
+            fprintf(output_file, "Current PID: %d. Mapped virtual page number %d to physical frame number %d\n", CURRENT_PID, VPN, PFN);
         }
         else
         {
-            fprintf(output_file, "Error: 'map' command requires a VPN and a PFN\n");
+            fprintf(output_file, "Error: Invalid VPN or PFN\n");
+        }
+    }
+
+    else if (tokens[0] && strcmp(tokens[0], "unmap") == 0)
+    {
+        if (!IS_DEFINED)
+        {
+            fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
+            return;
         }
     }
     // Other commands should be implemented similarly
