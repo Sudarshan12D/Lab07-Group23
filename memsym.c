@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <sys/types.h>
 
 #define TRUE 1
@@ -54,7 +55,7 @@ typedef struct
     int validBit;
 } TLBEntry;
 
-TLBEntry *tlb; // Fixed TLB of 8 entries
+TLBEntry *tlb;
 PageTableEntry **pageTables;
 
 // Function prototypes
@@ -324,13 +325,35 @@ void processCommand(char **tokens)
             int VPN = atoi(tokens[1]);
             int PFN = atoi(tokens[2]);
 
-            if (VPN >= 0 && VPN < pow(2, VPN) && PFN >= 0 && PFN < pow(2, PFN))
+            if ((VPN >= 0 && VPN < pow(2, VPN_BITS)) && (PFN >= 0 && PFN < pow(2, PFN_BITS)))
             {
                 // Update TLB
+                for (int i = 0; i < TLB_SIZE; i++)
+                {
+                    if (tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
+                    {
+                        tlb[i].PFN = PFN;
+                        tlb[i].validBit = 1;
+                        return;
+                    }
+                }
+
+                for (int i = 0; i < TLB_SIZE; i++)
+                {
+                    if (tlb[i].validBit == 0)
+                    {
+                        tlb[i].PFN = PFN;
+                        tlb[i].validBit = 1;
+                        tlb[i].VPN = VPN;
+                        tlb[i].pid = CURRENT_PID;
+                        return;
+                    }
+                }
 
                 // Update page table
                 pageTables[CURRENT_PID][VPN].PFN = PFN;
                 pageTables[CURRENT_PID][VPN].validBit = 1;
+                pageTables[CURRENT_PID][VPN].VPN = VPN;
 
                 fprintf(output_file, "Current PID: %d. Mapped virtual page number %d to physical frame number %d\n", CURRENT_PID, VPN, PFN);
             }
