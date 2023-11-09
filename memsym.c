@@ -201,24 +201,31 @@ void map2TLB(int VPN, int PFN) {
 int translateAddress(int virtualAddr) {
     int VPN = virtualAddr / pow(2, OFFSET_BITS); // Calculate the VPN from the virtual address
     int offset = virtualAddr % (int)pow(2, OFFSET_BITS);
+    int TLBHit = FALSE;
 
     // First, check the TLB for a quick lookup
     for (int i = 0; i < TLB_SIZE; i++) {
         if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID) {
             fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d hit in TLB entry %d. PFN is %d\n", CURRENT_PID, VPN, i, tlb[i].PFN);
+            TLBHit = TRUE;
             return tlb[i].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
         }
     }
 
-    // If not in TLB, check the page table
-    if (pageTables[CURRENT_PID][VPN].validBit) {
-        // Update the TLB with this new entry
-        map2TLB(VPN, pageTables[CURRENT_PID][VPN].PFN);
-        return pageTables[CURRENT_PID][VPN].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
+    if (!TLBHit) {
+        fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d caused a TLB miss\n", CURRENT_PID, VPN);
+        // If not in TLB, check the page table
+        if (pageTables[CURRENT_PID][VPN].validBit) {
+            // Update the TLB with this new entry
+            map2TLB(VPN, pageTables[CURRENT_PID][VPN].PFN);
+            return pageTables[CURRENT_PID][VPN].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
+        } else {
+            fprintf(output_file, "Current PID: %d. Translating. Translation for VPN %d not found in page table\n", CURRENT_PID, VPN);
+            return -1; // Page fault
+        }
     }
 
-    // Handle page fault if VPN is not valid
-    return -1;
+    return -1; // Page fault
 }
 
 void processCommand(char** tokens) {
@@ -479,7 +486,8 @@ void processCommand(char** tokens) {
                 physicalMemory[physicalAddr] = valueToStore;
                 fprintf(output_file, "Current PID: %d. Stored immediate %d into location %d\n", 
                         CURRENT_PID, valueToStore, virtualAddr);
-            } else {
+            } 
+            else {
                 fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
             }
         } else if (isValidRegister(tokens[2])) {

@@ -12,4 +12,6 @@ Current PID: 0. Switched execution context to process: 0
 Current PID: 0. Translating. Lookup for VPN 3 hit in TLB entry 0. PFN is 2
 Current PID: 0. Loaded value of location 3075 (42) into register r1
 Current PID: 1. Switched execution context to process: 1
+Current PID: 1. Translating. Lookup for VPN 3 caused a TLB miss
+Current PID: 1. Translating. Translation for VPN 3 not found in page table
 Current PID: 1. Page fault at virtual address 3075
