@@ -36,7 +36,7 @@ Current PID: 2. Translating. Lookup for VPN 0 hit in TLB entry 0. PFN is 10
 Current PID: 2. Stored immediate 11 into location 0
 Current PID: 2. Mapped virtual page number 8 to physical frame number 18
 Current PID: 2. Inspected TLB entry 0. VPN: 0. PFN: 10. Valid: 1. PID: 2. Timestamp: 27
-Current PID: 2. Inspected TLB entry 1. VPN: 8. PFN: 18. Valid: 1. PID: 2. Timestamp: 28
+Current PID: 2. Inspected TLB entry 1. VPN: 8. PFN: 18. Valid: 1. PID: 2. Timestamp: 8
 Current PID: 2. Inspected TLB entry 2. VPN: 2. PFN: 12. Valid: 1. PID: 2. Timestamp: 13
 Current PID: 2. Inspected TLB entry 3. VPN: 3. PFN: 13. Valid: 1. PID: 2. Timestamp: 14
 Current PID: 2. Inspected TLB entry 4. VPN: 4. PFN: 14. Valid: 1. PID: 2. Timestamp: 15
