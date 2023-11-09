@@ -41,6 +41,7 @@ FILE *output_file;
 // TLB replacement strategy (FIFO or LRU)
 char *tlbReplacementStrategy;
 
+// Define a structure for Page Table Entry
 typedef struct
 {
     int pid;
@@ -49,6 +50,7 @@ typedef struct
     int VPN;
 } PageTableEntry;
 
+// Define a structure for TLB Entry
 typedef struct
 {
     int pid;
@@ -58,13 +60,14 @@ typedef struct
     int validBit;
 } TLBEntry;
 
-TLBEntry *tlb;
-PageTableEntry **pageTables;
+TLBEntry *tlb;               // TLB array
+PageTableEntry **pageTables; // Page Tables for different processes
 
 // Function prototypes
 void processCommand(char **tokens);
 int isValidRegister(const char *reg);
 
+// Function to tokenize input
 char **tokenize_input(char *input)
 {
     char **tokens = NULL;
@@ -148,6 +151,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+// Function to check if a register is valid
 int isValidRegister(const char *reg)
 {
     if (reg[0] != 'r')
@@ -158,6 +162,7 @@ int isValidRegister(const char *reg)
     return (regNum >= 0 && regNum <= 31); // Assuming registers r0 to r31 are valid
 }
 
+// Function for context switch
 void contextSwitch(int new_pid)
 {
     // Save current process context
@@ -172,8 +177,11 @@ void contextSwitch(int new_pid)
     fprintf(output_file, "Current PID: %d. Switched execution context to process: %d\n", CURRENT_PID, CURRENT_PID);
 }
 
+// Function to map VPN to PFN in TLB
 void map2TLB(int VPN, int PFN)
 {
+
+    // Checks TLB for existing mapping
     for (int i = 0; i < TLB_SIZE; i++)
     {
         if (tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
@@ -185,6 +193,7 @@ void map2TLB(int VPN, int PFN)
         }
     }
 
+    // If mapping does not exist, add it to TLB by finding first invalid entry
     for (int i = 0; i < TLB_SIZE; i++)
     {
         if (tlb[i].validBit == 0)
@@ -198,8 +207,11 @@ void map2TLB(int VPN, int PFN)
         }
     }
 
-    int oldestTimestamp = tlb[0].timestamp;
+    // if TLB is full find which entry to replace
+    int oldestTimestamp = tlb[0].timestamp; // Initialize to first entry timestamp to start
     int oldestTimestampIndex = 0;
+
+    // Look for which entry has been in TLB the longest
     for (int i = 1; i < TLB_SIZE; i++)
     {
         if (tlb[i].timestamp < oldestTimestamp)
@@ -208,14 +220,18 @@ void map2TLB(int VPN, int PFN)
             oldestTimestampIndex = i;
         }
     }
+
+    // Replace the oldest/least recently used entry
     tlb[oldestTimestampIndex].VPN = VPN;
     tlb[oldestTimestampIndex].PFN = PFN;
-    tlb[oldestTimestampIndex].timestamp = counter; // Set the timestamp to the current counter value
+    tlb[oldestTimestampIndex].timestamp = counter;
     tlb[oldestTimestampIndex].pid = CURRENT_PID;
     tlb[oldestTimestampIndex].validBit = 1;
+
     return;
 }
 
+// Function to translate virtual address to physical address
 int translateAddress(int virtualAddr)
 {
     int VPN = virtualAddr / pow(2, OFFSET_BITS); // Calculate the VPN from the virtual address
@@ -269,6 +285,7 @@ int translateAddress(int virtualAddr)
     return -2; // Indicate address translation failure, but not a page fault
 }
 
+// Function to process all commands
 void processCommand(char **tokens)
 {
 
