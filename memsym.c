@@ -221,6 +221,8 @@ int translateAddress(int virtualAddr)
         }
     }
 
+    fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d caused a TLB miss", CURRENT_PID, VPN);
+
     // If not in TLB, check the page table
     if (pageTables[CURRENT_PID][VPN].validBit)
     {
@@ -228,9 +230,10 @@ int translateAddress(int virtualAddr)
         map2TLB(VPN, pageTables[CURRENT_PID][VPN].PFN);
         return pageTables[CURRENT_PID][VPN].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
     }
-
-    // Handle page fault if VPN is not valid
-    return -1;
+    else // Handle page fault if VPN is not valid
+    {
+        return -1;
+    }
 }
 
 void processCommand(char **tokens)
@@ -346,27 +349,20 @@ void processCommand(char **tokens)
                     registers[regIndex] = value;
                     fprintf(output_file, "Current PID: %d. Loaded immediate %s into register %s\n", CURRENT_PID, src + 1, dst);
                 }
-
-                else
-                {
-                    // TODO: Implement memory location loading
-                    // For now, let's just print a placeholder
-                    fprintf(output_file, "Current PID: %d. Loaded value of location %s (<value>) into register %s\n", CURRENT_PID, src, dst);
-                }
             }
             else
             {
                 int regIndex = atoi(dst + 1); // Get the register index, assuming 'rX' format
                 int virtualAddr = atoi(tokens[2]);
-                int physicalAddr = translateAddress(virtualAddr);
+                int translation = translateAddress(virtualAddr);
 
-                if (physicalAddr == -1)
+                if (translation == -1)
                 {
-                    fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
-                    return;
+                    fprintf(output_file, "Current PID: %d. Translating. Translation for VPN %d not found in page table\n", CURRENT_PID, translation);
+                    exit(1);
                 }
 
-                int memValue = physicalMemory[physicalAddr];
+                uint32_t memValue = physicalMemory[translation];
                 registers[regIndex] = memValue;
                 fprintf(output_file, "Current PID: %d. Loaded value of location %d (%d) into register r%d\n", CURRENT_PID, virtualAddr, memValue, regIndex);
             }
@@ -531,11 +527,11 @@ void processCommand(char **tokens)
         }
 
         int virtualAddr = atoi(tokens[1]);
-        int physicalAddr = translateAddress(virtualAddr);
+        int translation = translateAddress(virtualAddr);
 
-        if (physicalAddr == -1)
+        if (translation == -1)
         {
-            fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
+            fprintf(output_file, "Current PID: %d. Translating. Translation for VPN %d not found in page table \n", CURRENT_PID, translation);
             return;
         }
 
@@ -544,14 +540,14 @@ void processCommand(char **tokens)
             int regIndex = atoi(tokens[2] + 1); // Assuming rX format
             int regValue = registers[regIndex];
 
-            physicalMemory[physicalAddr] = regValue;
+            physicalMemory[translation] = regValue;
             fprintf(output_file, "Current PID: %d. Stored value of register r%d (%d) into location %d\n", CURRENT_PID, regIndex, regValue, virtualAddr);
         }
         else
         {
             int immediateValue = atoi(tokens[2] + 1); // Assuming the format is #value
 
-            physicalMemory[physicalAddr] = immediateValue;
+            physicalMemory[translation] = immediateValue;
             fprintf(output_file, "Current PID: %d. Stored immediate %d into location %d\n",
                     CURRENT_PID, immediateValue, virtualAddr);
         }
