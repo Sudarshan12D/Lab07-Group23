@@ -298,40 +298,39 @@ void processCommand(char** tokens) {
         static int error_reported = FALSE;
 
         if (!IS_DEFINED) {
-            if (!error_reported) { // Only print the error if it hasn't been reported already
+            if (!error_reported) {
                 fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
-                error_reported = TRUE; // Set to TRUE after reporting the error
+                error_reported = TRUE;
             }
-            return; // Early return since memory is not defined
+            return;
         }
 
         if (tokens[1] && tokens[2]) {
-            char* dst = tokens[1]; // Destination register
-            char* src = tokens[2]; // Source operand
+            char* dst = tokens[1];
+            char* src = tokens[2];
             
             if (!isValidRegister(dst)) {
                 fprintf(output_file, "Current PID: %d. Error: invalid register operand %s\n", CURRENT_PID, dst);
                 return;
             }
 
-            if (src[0] == '#') { // Immediate value
-                
-                int regIndex = atoi(dst + 1); // Get the register index, assuming 'rX' format
-                int value = atoi(src + 1);    // Get the immediate value
-                if (regIndex >= 0 && regIndex < MAX_REGISTERS) {
-                    registers[regIndex] = value;
-                    fprintf(output_file, "Current PID: %d. Loaded immediate %s into register %s\n", CURRENT_PID, src + 1, dst);
-                }
+            int regIndex = atoi(dst + 1);
 
-                else {
-                    // TODO: Implement memory location loading
-                    // For now, let's just print a placeholder
-                    fprintf(output_file, "Current PID: %d. Loaded value of location %s (<value>) into register %s\n", CURRENT_PID, src, dst);
+            if (src[0] == '#') { // Immediate value
+                int value = atoi(src + 1);
+                registers[regIndex] = value;
+                fprintf(output_file, "Current PID: %d. Loaded immediate %s into register %s\n", CURRENT_PID, src + 1, dst);
+            } else { // Load from memory address
+                int virtualAddr = atoi(src); 
+                int physicalAddr = translateAddress(virtualAddr);
+                if (physicalAddr == -1) {
+                    fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
+                } else {
+                    registers[regIndex] = physicalMemory[physicalAddr]; // Load from physical memory
+                    fprintf(output_file, "Current PID: %d. Loaded value of location %d (%d) into register %s\n", CURRENT_PID, virtualAddr, physicalMemory[physicalAddr], dst);
                 }
             }
-        }
-        else {
-            // Error: 'load' command requires a destination and a source operand
+        } else {
             fprintf(output_file, "Error: 'load' command requires a destination and a source operand.\n");
         }
 
@@ -459,24 +458,46 @@ void processCommand(char** tokens) {
     }
 
     else if (tokens[0] && strcmp(tokens[0], "store") == 0) {
-    
         if (!IS_DEFINED) {
             fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
             return;
         }
 
-        int virtualAddr = atoi(tokens[1]);
-        int immediateValue = atoi(tokens[2] + 1); // Assuming the format is #value
-
-        int physicalAddr = translateAddress(virtualAddr);
-        if (physicalAddr == -1) {
-            fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
+        if (!tokens[1] || !tokens[2]) {
+            fprintf(output_file, "Error: 'store' command requires both a virtual address and a value.\n");
             return;
         }
 
-        physicalMemory[physicalAddr] = immediateValue;
-        fprintf(output_file, "Current PID: %d. Stored immediate %d into location %d\n", 
-                CURRENT_PID, immediateValue, virtualAddr);
+        int virtualAddr = atoi(tokens[1]);
+        int valueToStore;
+
+        if (tokens[2][0] == '#') {
+            valueToStore = atoi(tokens[2] + 1); // Immediate value
+            // Store immediate value
+            int physicalAddr = translateAddress(virtualAddr);
+            if (physicalAddr != -1) {
+                physicalMemory[physicalAddr] = valueToStore;
+                fprintf(output_file, "Current PID: %d. Stored immediate %d into location %d\n", 
+                        CURRENT_PID, valueToStore, virtualAddr);
+            } else {
+                fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
+            }
+        } else if (isValidRegister(tokens[2])) {
+            int regIndex = atoi(tokens[2] + 1);
+            valueToStore = registers[regIndex]; // Value from register
+            // Store value from register
+            int physicalAddr = translateAddress(virtualAddr);
+            if (physicalAddr != -1) {
+                physicalMemory[physicalAddr] = valueToStore;
+                fprintf(output_file, "Current PID: %d. Stored value of register %s (%d) into location %d\n", 
+                        CURRENT_PID, tokens[2], valueToStore, virtualAddr);
+            } else {
+                fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
+            }
+        } else {
+            fprintf(output_file, "Current PID: %d. Error: invalid operand for store %s\n", CURRENT_PID, tokens[2]);
+            return;
+        }
     }
 
     else if (tokens[0] && strcmp(tokens[0], "linspect") == 0) {
