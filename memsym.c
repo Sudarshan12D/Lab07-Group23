@@ -197,7 +197,6 @@ void map2TLB(int VPN, int PFN) {
 }
 
 
-
 int translateAddress(int virtualAddr) {
     int VPN = virtualAddr / pow(2, OFFSET_BITS); // Calculate the VPN from the virtual address
     int offset = virtualAddr % (int)pow(2, OFFSET_BITS);
@@ -212,20 +211,31 @@ int translateAddress(int virtualAddr) {
         }
     }
 
+    // TLB miss
     if (!TLBHit) {
         fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d caused a TLB miss\n", CURRENT_PID, VPN);
-        // If not in TLB, check the page table
+
+        // Check the page table
         if (pageTables[CURRENT_PID][VPN].validBit) {
-            // Update the TLB with this new entry
+            // Update TLB and return physical address
             map2TLB(VPN, pageTables[CURRENT_PID][VPN].PFN);
-            return pageTables[CURRENT_PID][VPN].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
+            return pageTables[CURRENT_PID][VPN].PFN * pow(2, OFFSET_BITS) + offset;
         } else {
+            // VPN not found in the page table
             fprintf(output_file, "Current PID: %d. Translating. Translation for VPN %d not found in page table\n", CURRENT_PID, VPN);
-            return -1; // Page fault
+            // This is not necessarily a page fault, so do not log or return page fault here
         }
     }
 
-    return -1; // Page fault
+    // The function will reach here only if it's a real page fault
+    // Check if virtual address is valid and within range, if not, it's a page fault
+    if (VPN >= pow(2, VPN_BITS) || offset >= pow(2, OFFSET_BITS)) {
+        fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
+        return -1; // Page fault
+    }
+
+    // If the address is within range but VPN not found in page table, it's not a page fault
+    return -2; // Indicate address translation failure, but not a page fault
 }
 
 void processCommand(char** tokens) {
@@ -301,7 +311,6 @@ void processCommand(char** tokens) {
 
 
     else if (tokens[0] && strcmp(tokens[0], "load") == 0) {
-
         static int error_reported = FALSE;
 
         if (!IS_DEFINED) {
@@ -330,35 +339,43 @@ void processCommand(char** tokens) {
             } else { // Load from memory address
                 int virtualAddr = atoi(src); 
                 int physicalAddr = translateAddress(virtualAddr);
-                if (physicalAddr == -1) {
-                    fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
-                } else {
-                    registers[regIndex] = physicalMemory[physicalAddr]; // Load from physical memory
-                    fprintf(output_file, "Current PID: %d. Loaded value of location %d (%d) into register %s\n", CURRENT_PID, virtualAddr, physicalMemory[physicalAddr], dst);
+
+                // Check for translation failure
+                if (physicalAddr == -2) {
+                    // Translation failure, but not a page fault. Stop further processing.
+                    return;
                 }
+
+                if (physicalAddr == -1) {
+                    // Page fault. Log and stop further processing.
+                    fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
+                    return;
+                }
+
+                // Successful translation, load from physical memory
+                registers[regIndex] = physicalMemory[physicalAddr];
+                fprintf(output_file, "Current PID: %d. Loaded value of location %d (%d) into register %s\n", CURRENT_PID, virtualAddr, physicalMemory[physicalAddr], dst);
             }
         } else {
             fprintf(output_file, "Error: 'load' command requires a destination and a source operand.\n");
         }
-
-        error_reported = FALSE;
     }
 
    else if (tokens[0] && strcmp(tokens[0], "add") == 0) {
-    if (!IS_DEFINED) {
-        fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
-        return;
-    }
+        if (!IS_DEFINED) {
+            fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
+            return;
+        }
 
-    // Store the initial value of r1 before performing the addition
-    int initial_r1_value = registers[1];
+        // Store the initial value of r1 before performing the addition
+        int initial_r1_value = registers[1];
 
-    // Assuming the 'add' instruction adds the contents of r1 and r2 and stores the result in r1
-    int sum = initial_r1_value + registers[2];
-    registers[1] = sum; // Store the result back in r1
+        // Assuming the 'add' instruction adds the contents of r1 and r2 and stores the result in r1
+        int sum = initial_r1_value + registers[2];
+        registers[1] = sum; // Store the result back in r1
 
-    fprintf(output_file, "Current PID: %d. Added contents of registers r1 (%d) and r2 (%d). Result: %d\n",
-            CURRENT_PID, initial_r1_value, registers[2], sum);
+        fprintf(output_file, "Current PID: %d. Added contents of registers r1 (%d) and r2 (%d). Result: %d\n",
+                CURRENT_PID, initial_r1_value, registers[2], sum);
     }
 
     else if (tokens[0] && strcmp(tokens[0], "map") == 0)
