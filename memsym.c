@@ -354,6 +354,22 @@ void processCommand(char **tokens)
                     fprintf(output_file, "Current PID: %d. Loaded value of location %s (<value>) into register %s\n", CURRENT_PID, src, dst);
                 }
             }
+            else
+            {
+                int regIndex = atoi(dst + 1); // Get the register index, assuming 'rX' format
+                int virtualAddr = atoi(tokens[2]);
+                int physicalAddr = translateAddress(virtualAddr);
+
+                if (physicalAddr == -1)
+                {
+                    fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
+                    return;
+                }
+
+                int memValue = physicalMemory[physicalAddr];
+                registers[regIndex] = memValue;
+                fprintf(output_file, "Current PID: %d. Loaded value of location %d (%d) into register r%d\n", CURRENT_PID, virtualAddr, memValue, regIndex);
+            }
         }
         else
         {
@@ -515,18 +531,30 @@ void processCommand(char **tokens)
         }
 
         int virtualAddr = atoi(tokens[1]);
-        int immediateValue = atoi(tokens[2] + 1); // Assuming the format is #value
-
         int physicalAddr = translateAddress(virtualAddr);
+
         if (physicalAddr == -1)
         {
             fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
             return;
         }
 
-        physicalMemory[physicalAddr] = immediateValue;
-        fprintf(output_file, "Current PID: %d. Stored immediate %d into location %d\n",
-                CURRENT_PID, immediateValue, virtualAddr);
+        if (strcmp(tokens[2], "r1") == 0 || strcmp(tokens[2], "r2") == 0) // if storing value from register
+        {
+            int regIndex = atoi(tokens[2] + 1); // Assuming rX format
+            int regValue = registers[regIndex];
+
+            physicalMemory[physicalAddr] = regValue;
+            fprintf(output_file, "Current PID: %d. Stored value of register r%d (%d) into location %d\n", CURRENT_PID, regIndex, regValue, virtualAddr);
+        }
+        else
+        {
+            int immediateValue = atoi(tokens[2] + 1); // Assuming the format is #value
+
+            physicalMemory[physicalAddr] = immediateValue;
+            fprintf(output_file, "Current PID: %d. Stored immediate %d into location %d\n",
+                    CURRENT_PID, immediateValue, virtualAddr);
+        }
     }
 
     else if (tokens[0] && strcmp(tokens[0], "linspect") == 0)
