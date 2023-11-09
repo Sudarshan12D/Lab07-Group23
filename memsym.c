@@ -165,7 +165,6 @@ void contextSwitch(int new_pid) {
     fprintf(output_file, "Current PID: %d. Switched execution context to process: %d\n", CURRENT_PID, CURRENT_PID);
 }
 
-
 void map2TLB(int VPN, int PFN) {
     int replacementIndex = -1;
     uint32_t oldestTimestamp = UINT32_MAX;
@@ -181,8 +180,7 @@ void map2TLB(int VPN, int PFN) {
         if (!tlb[i].validBit && !foundEmptySlot) {
             replacementIndex = i; // First empty slot
             foundEmptySlot = TRUE;
-        }
-        else if (tlb[i].validBit && tlb[i].timestamp < oldestTimestamp) {
+        } else if (tlb[i].validBit && tlb[i].timestamp < oldestTimestamp) {
             oldestTimestamp = tlb[i].timestamp;
             replacementIndex = i; // Oldest entry for replacement
         }
@@ -196,7 +194,6 @@ void map2TLB(int VPN, int PFN) {
     tlb[replacementIndex].timestamp = counter; // Update timestamp for new or replaced entry
 }
 
-
 int translateAddress(int virtualAddr) {
     int VPN = virtualAddr / pow(2, OFFSET_BITS); // Calculate the VPN from the virtual address
     int offset = virtualAddr % (int)pow(2, OFFSET_BITS);
@@ -207,9 +204,11 @@ int translateAddress(int virtualAddr) {
         if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID) {
             fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d hit in TLB entry %d. PFN is %d\n", CURRENT_PID, VPN, i, tlb[i].PFN);
             TLBHit = TRUE;
+            tlb[i].timestamp = counter; // Update timestamp on hit
             return tlb[i].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
         }
     }
+    
 
     // TLB miss
     if (!TLBHit) {
