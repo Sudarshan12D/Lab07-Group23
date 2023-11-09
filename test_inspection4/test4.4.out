@@ -7,7 +7,7 @@ Current PID: 2. Mapped virtual page number 3 to physical frame number 13
 Current PID: 2. Mapped virtual page number 4 to physical frame number 14
 Current PID: 2. Mapped virtual page number 5 to physical frame number 15
 Current PID: 2. Mapped virtual page number 6 to physical frame number 16
-Current PID: 2. Mapped virtual page number 7 to physical frame number 17
+Current PID: 2. Mapped virtual page number 7 to physical frame number 17 
 Current PID: 2. Translating. Lookup for VPN 0 hit in TLB entry 0. PFN is 10
 Current PID: 2. Stored immediate 10 into location 0
 Current PID: 2. Translating. Lookup for VPN 1 hit in TLB entry 1. PFN is 11
