@@ -174,72 +174,46 @@ void contextSwitch(int new_pid)
 
 void map2TLB(int VPN, int PFN)
 {
-    int replacementIndex = -1;
-    static uint32_t fifoCounter = 0;
-    uint32_t oldestTimestamp = UINT32_MAX;
-    int foundEmptySlot = FALSE;
-
-    // Search for existing entry or the first empty slot
     for (int i = 0; i < TLB_SIZE; i++)
     {
-        if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
+        if (tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
         {
             tlb[i].PFN = PFN;
-            if (strcmp(tlbReplacementStrategy, "LRU") == 0)
-            {
-                tlb[i].timestamp = counter; // Update timestamp on hit for LRU
-            }
+            tlb[i].timestamp = counter;
+            tlb[i].validBit = 1;
             return;
         }
-        if (strcmp(tlbReplacementStrategy, "FIFO") == 0)
+    }
+    // if no mapping exists, find the first invalid entry
+    for (int i = 0; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].validBit == 0)
         {
-            if (!tlb[i].validBit && replacementIndex == -1)
-            {
-                replacementIndex = i; // First empty slot for FIFO
-            }
-        }
-        else if (strcmp(tlbReplacementStrategy, "LRU") == 0)
-        {
-            if (!tlb[i].validBit && !foundEmptySlot)
-            {
-                replacementIndex = i; // First empty slot for LRU
-                foundEmptySlot = TRUE;
-            }
-            else if (tlb[i].validBit && tlb[i].timestamp < oldestTimestamp)
-            {
-                oldestTimestamp = tlb[i].timestamp;
-                replacementIndex = i; // Oldest entry for LRU replacement
-            }
+            tlb[i].VPN = VPN;
+            tlb[i].PFN = PFN;
+            tlb[i].timestamp = counter; // Set the timestamp to the current counter value
+            tlb[i].pid = CURRENT_PID;
+            tlb[i].validBit = 1;
+            return;
         }
     }
 
-    // For FIFO, if all entries are valid, replace the oldest entry by insertion order
-    if (strcmp(tlbReplacementStrategy, "FIFO") == 0 && replacementIndex == -1)
+    int min_timestamp = tlb[0].timestamp;
+    int min_timestamp_index = 0;
+    for (int i = 1; i < 8; i++)
     {
-        oldestTimestamp = UINT32_MAX;
-        for (int i = 0; i < TLB_SIZE; i++)
+        if (tlb[i].timestamp < min_timestamp)
         {
-            if (tlb[i].timestamp < oldestTimestamp)
-            {
-                oldestTimestamp = tlb[i].timestamp;
-                replacementIndex = i;
-            }
+            min_timestamp = tlb[i].timestamp;
+            min_timestamp_index = i;
         }
     }
-
-    // Replace the chosen entry
-    tlb[replacementIndex].pid = CURRENT_PID;
-    tlb[replacementIndex].VPN = VPN;
-    tlb[replacementIndex].PFN = PFN;
-    tlb[replacementIndex].validBit = 1;
-    if (strcmp(tlbReplacementStrategy, "FIFO") == 0)
-    {
-        tlb[replacementIndex].timestamp = fifoCounter++; // FIFO counter for insertion order
-    }
-    else if (strcmp(tlbReplacementStrategy, "LRU") == 0)
-    {
-        tlb[replacementIndex].timestamp = counter; // Update timestamp for new or replaced entry for LRU
-    }
+    tlb[min_timestamp_index].VPN = VPN;
+    tlb[min_timestamp_index].PFN = PFN;
+    tlb[min_timestamp_index].timestamp = counter; // Set the timestamp to the current counter value
+    tlb[min_timestamp_index].pid = CURRENT_PID;
+    tlb[min_timestamp_index].validBit = 1;
+    return;
 }
 
 int translateAddress(int virtualAddr)
@@ -255,7 +229,10 @@ int translateAddress(int virtualAddr)
         {
             fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d hit in TLB entry %d. PFN is %d\n", CURRENT_PID, VPN, i, tlb[i].PFN);
             TLBHit = TRUE;
-            tlb[i].timestamp = counter;                       // Update timestamp on hit
+            if (strcmp(tlbReplacementStrategy, "LRU") == 0)
+            {
+                tlb[i].timestamp = counter; // Update timestamp on hit
+            }
             return tlb[i].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
         }
     }
