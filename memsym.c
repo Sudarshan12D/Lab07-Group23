@@ -39,7 +39,7 @@ uint32_t *physicalMemory;
 FILE *output_file;
 
 // TLB replacement strategy (FIFO or LRU)
-char *strategy;
+char *tlbReplacementStrategy;
 
 typedef struct
 {
@@ -100,7 +100,8 @@ int main(int argc, char *argv[])
         printf("%s", usage);
         return 1;
     }
-    strategy = argv[1];
+
+    tlbReplacementStrategy = argv[1];
     input_trace = argv[2];
     output_trace = argv[3];
 
@@ -174,6 +175,7 @@ void contextSwitch(int new_pid)
 void map2TLB(int VPN, int PFN)
 {
     int replacementIndex = -1;
+    static uint32_t fifoCounter = 0;
     uint32_t oldestTimestamp = UINT32_MAX;
     int foundEmptySlot = FALSE;
 
@@ -183,18 +185,45 @@ void map2TLB(int VPN, int PFN)
         if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
         {
             tlb[i].PFN = PFN;
-            tlb[i].timestamp = counter; // Update timestamp on hit
+            if (strcmp(tlbReplacementStrategy, "LRU") == 0)
+            {
+                tlb[i].timestamp = counter; // Update timestamp on hit for LRU
+            }
             return;
         }
-        if (!tlb[i].validBit && !foundEmptySlot)
+        if (strcmp(tlbReplacementStrategy, "FIFO") == 0)
         {
-            replacementIndex = i; // First empty slot
-            foundEmptySlot = TRUE;
+            if (!tlb[i].validBit && replacementIndex == -1)
+            {
+                replacementIndex = i; // First empty slot for FIFO
+            }
         }
-        else if (tlb[i].validBit && tlb[i].timestamp < oldestTimestamp)
+        else if (strcmp(tlbReplacementStrategy, "LRU") == 0)
         {
-            oldestTimestamp = tlb[i].timestamp;
-            replacementIndex = i; // Oldest entry for replacement
+            if (!tlb[i].validBit && !foundEmptySlot)
+            {
+                replacementIndex = i; // First empty slot for LRU
+                foundEmptySlot = TRUE;
+            }
+            else if (tlb[i].validBit && tlb[i].timestamp < oldestTimestamp)
+            {
+                oldestTimestamp = tlb[i].timestamp;
+                replacementIndex = i; // Oldest entry for LRU replacement
+            }
+        }
+    }
+
+    // For FIFO, if all entries are valid, replace the oldest entry by insertion order
+    if (strcmp(tlbReplacementStrategy, "FIFO") == 0 && replacementIndex == -1)
+    {
+        oldestTimestamp = UINT32_MAX;
+        for (int i = 0; i < TLB_SIZE; i++)
+        {
+            if (tlb[i].timestamp < oldestTimestamp)
+            {
+                oldestTimestamp = tlb[i].timestamp;
+                replacementIndex = i;
+            }
         }
     }
 
@@ -203,7 +232,14 @@ void map2TLB(int VPN, int PFN)
     tlb[replacementIndex].VPN = VPN;
     tlb[replacementIndex].PFN = PFN;
     tlb[replacementIndex].validBit = 1;
-    tlb[replacementIndex].timestamp = counter; // Update timestamp for new or replaced entry
+    if (strcmp(tlbReplacementStrategy, "FIFO") == 0)
+    {
+        tlb[replacementIndex].timestamp = fifoCounter++; // FIFO counter for insertion order
+    }
+    else if (strcmp(tlbReplacementStrategy, "LRU") == 0)
+    {
+        tlb[replacementIndex].timestamp = counter; // Update timestamp for new or replaced entry for LRU
+    }
 }
 
 int translateAddress(int virtualAddr)
