@@ -184,35 +184,35 @@ void map2TLB(int VPN, int PFN)
             return;
         }
     }
-    // if no mapping exists, find the first invalid entry
+
     for (int i = 0; i < TLB_SIZE; i++)
     {
         if (tlb[i].validBit == 0)
         {
             tlb[i].VPN = VPN;
             tlb[i].PFN = PFN;
-            tlb[i].timestamp = counter; // Set the timestamp to the current counter value
+            tlb[i].timestamp = counter;
             tlb[i].pid = CURRENT_PID;
             tlb[i].validBit = 1;
             return;
         }
     }
 
-    int min_timestamp = tlb[0].timestamp;
-    int min_timestamp_index = 0;
-    for (int i = 1; i < 8; i++)
+    int oldestTimestamp = tlb[0].timestamp;
+    int oldestTimestampIndex = 0;
+    for (int i = 1; i < TLB_SIZE; i++)
     {
-        if (tlb[i].timestamp < min_timestamp)
+        if (tlb[i].timestamp < oldestTimestamp)
         {
-            min_timestamp = tlb[i].timestamp;
-            min_timestamp_index = i;
+            oldestTimestamp = tlb[i].timestamp;
+            oldestTimestampIndex = i;
         }
     }
-    tlb[min_timestamp_index].VPN = VPN;
-    tlb[min_timestamp_index].PFN = PFN;
-    tlb[min_timestamp_index].timestamp = counter; // Set the timestamp to the current counter value
-    tlb[min_timestamp_index].pid = CURRENT_PID;
-    tlb[min_timestamp_index].validBit = 1;
+    tlb[oldestTimestampIndex].VPN = VPN;
+    tlb[oldestTimestampIndex].PFN = PFN;
+    tlb[oldestTimestampIndex].timestamp = counter; // Set the timestamp to the current counter value
+    tlb[oldestTimestampIndex].pid = CURRENT_PID;
+    tlb[oldestTimestampIndex].validBit = 1;
     return;
 }
 
@@ -231,7 +231,7 @@ int translateAddress(int virtualAddr)
             TLBHit = TRUE;
             if (strcmp(tlbReplacementStrategy, "LRU") == 0)
             {
-                tlb[i].timestamp = counter; // Update timestamp on hit
+                tlb[i].timestamp = counter; // Update timestamp on hit for LRU only
             }
             return tlb[i].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
         }
