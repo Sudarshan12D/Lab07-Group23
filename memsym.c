@@ -2,10 +2,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-<<<<<<< HEAD
-=======
 
->>>>>>> main
 #include <math.h>
 #include <sys/types.h>
 
@@ -17,12 +14,8 @@
 #define MAX_REGISTERS 32
 #define TLB_SIZE 8
 #define PAGETABLE_SIZE 4
-    <<<<<<< HEAD
-=======
 
->>>>>>> main
-
-    int registers[MAX_REGISTERS] = {0};
+int registers[MAX_REGISTERS] = {0};
 
 // Define a process context structure
 typedef struct
@@ -38,11 +31,7 @@ int PFN_BITS = -1;
 int VPN_BITS = -1;
 int CURRENT_PID = 0;
 int IS_DEFINED = FALSE;
-<<<<<<< HEAD
-u_int32_t counter = 0;
-=======
 int32_t counter = -1;
->>>>>>> main
 
 uint32_t *physicalMemory;
 
@@ -155,10 +144,6 @@ int main(int argc, char *argv[])
     free(tlb);
     free(pageTables);
 
-<<<<<<< HEAD
-=======
-
->>>>>>> main
     return 0;
 }
 
@@ -188,142 +173,79 @@ void contextSwitch(int new_pid)
 
 void map2TLB(int VPN, int PFN)
 {
-    // Check to see if tlb already contains entry
-    for (int i = 0; i < TLB_SIZE; i++)
-    {
-        if (tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
-        {
-            tlb[i].validBit = 1;
-            tlb[i].PFN = PFN;
-            tlb[i].timestamp = counter;
-        }
-    }
+    int replacementIndex = -1;
+    uint32_t oldestTimestamp = UINT32_MAX;
+    int foundEmptySlot = FALSE;
 
-<<<<<<< HEAD
-    // If tlb does not contain entry, then find first invalid entry and set values there
+    // Search for existing entry or the first empty slot
     for (int i = 0; i < TLB_SIZE; i++)
     {
-        if (tlb[i].validBit == 0)
+        if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
         {
-            tlb[i].pid = CURRENT_PID;
             tlb[i].PFN = PFN;
-            tlb[i].VPN = VPN;
-            tlb[i].validBit = 1;
-            tlb[i].timestamp = counter;
+            tlb[i].timestamp = counter; // Update timestamp on hit
             return;
         }
-    }
-
-    // initialize minimum timestamp
-    int minTimestamp = tlb[0].timestamp;
-    int minTimestampIndex = 0;
-
-    // search tlb for minimum timestamp
-    for (int i = 0; i < TLB_SIZE; i++)
-    {
-        if (tlb[i].timestamp < minTimestamp)
+        if (!tlb[i].validBit && !foundEmptySlot)
         {
-            minTimestamp = tlb[i].timestamp;
-            minTimestampIndex = i;
+            replacementIndex = i; // First empty slot
+            foundEmptySlot = TRUE;
+        }
+        else if (tlb[i].validBit && tlb[i].timestamp < oldestTimestamp)
+        {
+            oldestTimestamp = tlb[i].timestamp;
+            replacementIndex = i; // Oldest entry for replacement
         }
     }
 
-    // set new values
-    tlb[minTimestampIndex].pid = CURRENT_PID;
-    tlb[minTimestampIndex].VPN = VPN;
-    tlb[minTimestampIndex].PFN = PFN;
-    tlb[minTimestampIndex].validBit = 1;
-    tlb[minTimestampIndex].timestamp = counter;
+    // Replace the chosen entry
+    tlb[replacementIndex].pid = CURRENT_PID;
+    tlb[replacementIndex].VPN = VPN;
+    tlb[replacementIndex].PFN = PFN;
+    tlb[replacementIndex].validBit = 1;
+    tlb[replacementIndex].timestamp = counter; // Update timestamp for new or replaced entry
+}
 
-    return;
+int translateAddress(int virtualAddr)
+{
+    int VPN = virtualAddr / pow(2, OFFSET_BITS); // Calculate the VPN from the virtual address
+    int offset = virtualAddr % (int)pow(2, OFFSET_BITS);
+
+    // First, check the TLB for a quick lookup
+    for (int i = 0; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
+        {
+            fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d hit in TLB entry %d. PFN is %d\n", CURRENT_PID, VPN, i, tlb[i].PFN);
+            return tlb[i].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
+        }
+    }
+
+    // If not in TLB, check the page table
+    if (pageTables[CURRENT_PID][VPN].validBit)
+    {
+        // Update the TLB with this new entry
+        map2TLB(VPN, pageTables[CURRENT_PID][VPN].PFN);
+        return pageTables[CURRENT_PID][VPN].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
+    }
+
+    // Handle page fault if VPN is not valid
+    return -1;
 }
 
 void processCommand(char **tokens)
 {
+
     counter++;
 
     if (tokens[0] && strcmp(tokens[0], "define") == 0)
     {
         if (IS_DEFINED)
         {
-=======
-    void map2TLB(int VPN, int PFN)
-    {
-        int replacementIndex = -1;
-        uint32_t oldestTimestamp = UINT32_MAX;
-        int foundEmptySlot = FALSE;
-
-        // Search for existing entry or the first empty slot
-        for (int i = 0; i < TLB_SIZE; i++)
-        {
-            if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
-            {
-                tlb[i].PFN = PFN;
-                tlb[i].timestamp = counter; // Update timestamp on hit
-                return;
-            }
-            if (!tlb[i].validBit && !foundEmptySlot)
-            {
-                replacementIndex = i; // First empty slot
-                foundEmptySlot = TRUE;
-            }
-            else if (tlb[i].validBit && tlb[i].timestamp < oldestTimestamp)
-            {
-                oldestTimestamp = tlb[i].timestamp;
-                replacementIndex = i; // Oldest entry for replacement
-            }
-        }
-
-        // Replace the chosen entry
-        tlb[replacementIndex].pid = CURRENT_PID;
-        tlb[replacementIndex].VPN = VPN;
-        tlb[replacementIndex].PFN = PFN;
-        tlb[replacementIndex].validBit = 1;
-        tlb[replacementIndex].timestamp = counter; // Update timestamp for new or replaced entry
-    }
-
-    int translateAddress(int virtualAddr)
-    {
-        int VPN = virtualAddr / pow(2, OFFSET_BITS); // Calculate the VPN from the virtual address
-        int offset = virtualAddr % (int)pow(2, OFFSET_BITS);
-
-        // First, check the TLB for a quick lookup
-        for (int i = 0; i < TLB_SIZE; i++)
-        {
-            if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
-            {
-                fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d hit in TLB entry %d. PFN is %d\n", CURRENT_PID, VPN, i, tlb[i].PFN);
-                return tlb[i].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
-            }
-        }
-
-        // If not in TLB, check the page table
-        if (pageTables[CURRENT_PID][VPN].validBit)
-        {
-            // Update the TLB with this new entry
-            map2TLB(VPN, pageTables[CURRENT_PID][VPN].PFN);
-            return pageTables[CURRENT_PID][VPN].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
-        }
-
-        // Handle page fault if VPN is not valid
-        return -1;
-    }
-
-    void processCommand(char **tokens)
-    {
-
-        counter++;
-
-        if (tokens[0] && strcmp(tokens[0], "define") == 0)
-        {
-            if (IS_DEFINED)
-            {
->>>>>>> main
             // If already defined, print an error and return
             fprintf(output_file, "Current PID: %d. Error: multiple calls to define in the same trace\n", CURRENT_PID);
             return;
         }
-
         OFFSET_BITS = atoi(tokens[1]);
         PFN_BITS = atoi(tokens[2]);
         VPN_BITS = atoi(tokens[3]);
@@ -362,11 +284,7 @@ void processCommand(char **tokens)
             physicalMemory[i] = 0;
         }
 
-<<<<<<< HEAD
         fprintf(output_file, "Current PID: %d. Memory instantiation complete. OFF bits: %d. PFN bits: %d. VPN bits: %d\n",
-=======
-            fprintf(output_file, "Current PID: %d. Memory instantiation complete. OFF bits: %d. PFN bits: %d. VPN bits: %d\n", 
->>>>>>> main
                 CURRENT_PID, OFFSET_BITS, PFN_BITS, VPN_BITS);
     }
 
@@ -494,11 +412,7 @@ void processCommand(char **tokens)
         }
     }
 
-<<<<<<< HEAD
     else if (tokens[0] && strcmp(tokens[0], "unmap") == 0)
-=======
-        else if (tokens[0] && strcmp(tokens[0], "map") == 0)
->>>>>>> main
     {
         if (!IS_DEFINED)
         {
@@ -507,58 +421,16 @@ void processCommand(char **tokens)
         }
 
         int VPN = atoi(tokens[1]);
-<<<<<<< HEAD
-
         if (VPN >= 0 && VPN < pow(2, VPN_BITS))
         {
+
             for (int i = 0; i < TLB_SIZE; i++)
             {
-                if (tlb[i].pid == CURRENT_PID && tlb[i].VPN == VPN)
-                {
-                    // Found a mapping in TLB, invalidate it
-                    tlb[i].validBit = 0;
-                    break;
-=======
-            int PFN = atoi(tokens[2]);
 
-            if ((VPN >= 0 && VPN < pow(2, VPN_BITS)) && (PFN >= 0 && PFN < pow(2, PFN_BITS)))
-            {
-                // Update TLB
-                map2TLB(VPN, PFN);
-
-                // Update page table
-                pageTables[CURRENT_PID][VPN].PFN = PFN;
-                pageTables[CURRENT_PID][VPN].validBit = 1;
-                pageTables[CURRENT_PID][VPN].VPN = VPN;
-
-                fprintf(output_file, "Current PID: %d. Mapped virtual page number %d to physical frame number %d\n", CURRENT_PID, VPN, PFN);
-            }
-            else
-            {
-                fprintf(output_file, "Error: Invalid VPN or PFN\n");
-            }
-        }
-
-        else if (tokens[0] && strcmp(tokens[0], "unmap") == 0)
-        {
-            if (!IS_DEFINED)
-            {
-                fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
-                return;
-            }
-
-            int VPN = atoi(tokens[1]);
-            if (VPN >= 0 && VPN < pow(2, VPN_BITS))
-            {
-
-                for (int i = 0; i < TLB_SIZE; i++)
+                if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
                 {
 
-                    if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
-                    {
-
-                        tlb[i].validBit = 0;              // Invalidate TLB entry
->>>>>>> main
+                    tlb[i].validBit = 0; // Invalidate TLB entry
                 }
             }
 
@@ -567,10 +439,7 @@ void processCommand(char **tokens)
             {
                 // Found a mapping in page table, invalidate it
                 pageTables[CURRENT_PID][VPN].validBit = 0;
-<<<<<<< HEAD
-=======
-                    pageTables[CURRENT_PID][VPN].PFN = 0; // Reset the PFN
->>>>>>> main
+                pageTables[CURRENT_PID][VPN].PFN = 0; // Reset the PFN
             }
 
             fprintf(output_file, "Current PID: %d. Unmapped virtual page number %d\n", CURRENT_PID, VPN);
