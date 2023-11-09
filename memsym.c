@@ -15,20 +15,18 @@
 #define TLB_SIZE 8
 #define PAGETABLE_SIZE 4
 
-
 int registers[MAX_REGISTERS] = {0};
 
-
 // Define a process context structure
-typedef struct {
+typedef struct
+{
     int registers[MAX_REGISTERS];
 } ProcessContext;
-
 
 ProcessContext processContexts[MAX_PROCESSES];
 
 // Memory parameters
-int OFFSET_BITS = -1; 
+int OFFSET_BITS = -1;
 int PFN_BITS = -1;
 int VPN_BITS = -1;
 int CURRENT_PID = 0;
@@ -38,10 +36,10 @@ int32_t counter = -1;
 uint32_t *physicalMemory;
 
 // Output file
-FILE* output_file;
+FILE *output_file;
 
 // TLB replacement strategy (FIFO or LRU)
-char* tlbReplacementStrategy;
+char *tlbReplacementStrategy;
 
 typedef struct
 {
@@ -64,39 +62,41 @@ TLBEntry *tlb;
 PageTableEntry **pageTables;
 
 // Function prototypes
-void processCommand(char** tokens);
-int isValidRegister(const char* reg);
+void processCommand(char **tokens);
+int isValidRegister(const char *reg);
 
-
-
-char** tokenize_input(char* input) {
-    char** tokens = NULL;
-    char* token = strtok(input, " ");
+char **tokenize_input(char *input)
+{
+    char **tokens = NULL;
+    char *token = strtok(input, " ");
     int num_tokens = 0;
 
-    while (token != NULL) {
+    while (token != NULL)
+    {
         num_tokens++;
-        tokens = realloc(tokens, num_tokens * sizeof(char*));
+        tokens = realloc(tokens, num_tokens * sizeof(char *));
         tokens[num_tokens - 1] = malloc(strlen(token) + 1);
         strcpy(tokens[num_tokens - 1], token);
         token = strtok(NULL, " ");
     }
 
     num_tokens++;
-    tokens = realloc(tokens, num_tokens * sizeof(char*));
+    tokens = realloc(tokens, num_tokens * sizeof(char *));
     tokens[num_tokens - 1] = NULL;
 
     return tokens;
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
     const char usage[] = "Usage: memsym.out <strategy> <input trace> <output trace>\n";
-    char* input_trace;
-    char* output_trace;
+    char *input_trace;
+    char *output_trace;
     char buffer[1024];
 
     // Parse command line arguments
-    if (argc != 4) {
+    if (argc != 4)
+    {
         printf("%s", usage);
         return 1;
     }
@@ -106,22 +106,27 @@ int main(int argc, char* argv[]) {
     output_trace = argv[3];
 
     // Open input and output files
-    FILE* input_file = fopen(input_trace, "r");
-    output_file = fopen(output_trace, "w");  
+    FILE *input_file = fopen(input_trace, "r");
+    output_file = fopen(output_trace, "w");
 
-    while ( !feof(input_file) ) {
+    while (!feof(input_file))
+    {
         // Read input file line by line
         char *rez = fgets(buffer, sizeof(buffer), input_file);
-        if ( !rez ) {
+        if (!rez)
+        {
             fprintf(stderr, "Reached end of trace. Exiting...\n");
             return -1;
-        } else {
+        }
+        else
+        {
             size_t len = strlen(buffer);
-            if (len > 0 && buffer[len - 1] == '\n') {
+            if (len > 0 && buffer[len - 1] == '\n')
+            {
                 buffer[len - 1] = '\0';
             }
         }
-        char** tokens = tokenize_input(buffer);
+        char **tokens = tokenize_input(buffer);
         processCommand(tokens);
 
         // TODO: Implement your memory simulator
@@ -140,20 +145,21 @@ int main(int argc, char* argv[]) {
     free(tlb);
     free(pageTables);
 
-
     return 0;
 }
 
-int isValidRegister(const char* reg) {
-    if (reg[0] != 'r') {
+int isValidRegister(const char *reg)
+{
+    if (reg[0] != 'r')
+    {
         return FALSE;
     }
     long regNum = strtol(&reg[1], NULL, 10);
     return (regNum >= 0 && regNum <= 31); // Assuming registers r0 to r31 are valid
 }
 
-
-void contextSwitch(int new_pid) {
+void contextSwitch(int new_pid)
+{
     // Save current process context
     memcpy(processContexts[CURRENT_PID].registers, registers, sizeof(registers));
 
@@ -166,92 +172,85 @@ void contextSwitch(int new_pid) {
     fprintf(output_file, "Current PID: %d. Switched execution context to process: %d\n", CURRENT_PID, CURRENT_PID);
 }
 
-
-
-void map2TLB(int VPN, int PFN) {
-    int replacementIndex = -1;
-    static uint32_t fifoCounter = 0;
-    uint32_t oldestTimestamp = UINT32_MAX;
-    int foundEmptySlot = FALSE;
-
-    // Search for existing entry or the first empty slot
-    for (int i = 0; i < TLB_SIZE; i++) {
-        if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID) {
+void map2TLB(int VPN, int PFN)
+{
+    for (int i = 0; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
+        {
             tlb[i].PFN = PFN;
-            if (strcmp(tlbReplacementStrategy, "LRU") == 0) {
-                tlb[i].timestamp = counter; // Update timestamp on hit for LRU
-            }
+            tlb[i].timestamp = counter;
+            tlb[i].validBit = 1;
             return;
         }
-        if (strcmp(tlbReplacementStrategy, "FIFO") == 0) {
-            if (!tlb[i].validBit && replacementIndex == -1) {
-                replacementIndex = i; // First empty slot for FIFO
-            }
-        } else if (strcmp(tlbReplacementStrategy, "LRU") == 0) {
-            if (!tlb[i].validBit && !foundEmptySlot) {
-                replacementIndex = i; // First empty slot for LRU
-                foundEmptySlot = TRUE;
-            } else if (tlb[i].validBit && tlb[i].timestamp < oldestTimestamp) {
-                oldestTimestamp = tlb[i].timestamp;
-                replacementIndex = i; // Oldest entry for LRU replacement
-            }
+    }
+
+    for (int i = 0; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].validBit == 0)
+        {
+            tlb[i].VPN = VPN;
+            tlb[i].PFN = PFN;
+            tlb[i].timestamp = counter;
+            tlb[i].pid = CURRENT_PID;
+            tlb[i].validBit = 1;
+            return;
         }
     }
 
-    // For FIFO, if all entries are valid, replace the oldest entry by insertion order
-    if (strcmp(tlbReplacementStrategy, "FIFO") == 0 && replacementIndex == -1) {
-        oldestTimestamp = UINT32_MAX;
-        for (int i = 0; i < TLB_SIZE; i++) {
-            if (tlb[i].timestamp < oldestTimestamp) {
-                oldestTimestamp = tlb[i].timestamp;
-                replacementIndex = i;
-            }
+    int oldestTimestamp = tlb[0].timestamp;
+    int oldestTimestampIndex = 0;
+    for (int i = 1; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].timestamp < oldestTimestamp)
+        {
+            oldestTimestamp = tlb[i].timestamp;
+            oldestTimestampIndex = i;
         }
     }
-
-    // Replace the chosen entry
-    tlb[replacementIndex].pid = CURRENT_PID;
-    tlb[replacementIndex].VPN = VPN;
-    tlb[replacementIndex].PFN = PFN;
-    tlb[replacementIndex].validBit = 1;
-    if (strcmp(tlbReplacementStrategy, "FIFO") == 0) {
-        tlb[replacementIndex].timestamp = fifoCounter++; // FIFO counter for insertion order
-    } else if (strcmp(tlbReplacementStrategy, "LRU") == 0) {
-        tlb[replacementIndex].timestamp = counter; // Update timestamp for new or replaced entry for LRU
-    }
+    tlb[oldestTimestampIndex].VPN = VPN;
+    tlb[oldestTimestampIndex].PFN = PFN;
+    tlb[oldestTimestampIndex].timestamp = counter; // Set the timestamp to the current counter value
+    tlb[oldestTimestampIndex].pid = CURRENT_PID;
+    tlb[oldestTimestampIndex].validBit = 1;
+    return;
 }
 
-
-
-
-
-
-int translateAddress(int virtualAddr) {
+int translateAddress(int virtualAddr)
+{
     int VPN = virtualAddr / pow(2, OFFSET_BITS); // Calculate the VPN from the virtual address
     int offset = virtualAddr % (int)pow(2, OFFSET_BITS);
     int TLBHit = FALSE;
 
     // First, check the TLB for a quick lookup
-    for (int i = 0; i < TLB_SIZE; i++) {
-        if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID) {
+    for (int i = 0; i < TLB_SIZE; i++)
+    {
+        if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
+        {
             fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d hit in TLB entry %d. PFN is %d\n", CURRENT_PID, VPN, i, tlb[i].PFN);
             TLBHit = TRUE;
-            tlb[i].timestamp = counter; // Update timestamp on hit
+            if (strcmp(tlbReplacementStrategy, "LRU") == 0)
+            {
+                tlb[i].timestamp = counter; // Update timestamp on hit for LRU only
+            }
             return tlb[i].PFN * pow(2, OFFSET_BITS) + offset; // Return physical address
         }
     }
-    
 
     // TLB miss
-    if (!TLBHit) {
+    if (!TLBHit)
+    {
         fprintf(output_file, "Current PID: %d. Translating. Lookup for VPN %d caused a TLB miss\n", CURRENT_PID, VPN);
 
         // Check the page table
-        if (pageTables[CURRENT_PID][VPN].validBit) {
+        if (pageTables[CURRENT_PID][VPN].validBit)
+        {
             // Update TLB and return physical address
             map2TLB(VPN, pageTables[CURRENT_PID][VPN].PFN);
             return pageTables[CURRENT_PID][VPN].PFN * pow(2, OFFSET_BITS) + offset;
-        } else {
+        }
+        else
+        {
             // VPN not found in the page table
             fprintf(output_file, "Current PID: %d. Translating. Translation for VPN %d not found in page table\n", CURRENT_PID, VPN);
             // This is not necessarily a page fault, so do not log or return page fault here
@@ -260,7 +259,8 @@ int translateAddress(int virtualAddr) {
 
     // The function will reach here only if it's a real page fault
     // Check if virtual address is valid and within range, if not, it's a page fault
-    if (VPN >= pow(2, VPN_BITS) || offset >= pow(2, OFFSET_BITS)) {
+    if (VPN >= pow(2, VPN_BITS) || offset >= pow(2, OFFSET_BITS))
+    {
         fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
         return -1; // Page fault
     }
@@ -269,13 +269,15 @@ int translateAddress(int virtualAddr) {
     return -2; // Indicate address translation failure, but not a page fault
 }
 
-void processCommand(char** tokens) {
+void processCommand(char **tokens)
+{
 
     counter++;
 
-
-    if (tokens[0] && strcmp(tokens[0], "define") == 0) {
-        if (IS_DEFINED) {
+    if (tokens[0] && strcmp(tokens[0], "define") == 0)
+    {
+        if (IS_DEFINED)
+        {
             // If already defined, print an error and return
             fprintf(output_file, "Current PID: %d. Error: multiple calls to define in the same trace\n", CURRENT_PID);
             return;
@@ -318,11 +320,12 @@ void processCommand(char** tokens) {
             physicalMemory[i] = 0;
         }
 
-        fprintf(output_file, "Current PID: %d. Memory instantiation complete. OFF bits: %d. PFN bits: %d. VPN bits: %d\n", 
+        fprintf(output_file, "Current PID: %d. Memory instantiation complete. OFF bits: %d. PFN bits: %d. VPN bits: %d\n",
                 CURRENT_PID, OFFSET_BITS, PFN_BITS, VPN_BITS);
     }
 
-    else if (tokens[0] && strcmp(tokens[0], "ctxswitch") == 0) {
+    else if (tokens[0] && strcmp(tokens[0], "ctxswitch") == 0)
+    {
 
         if (!IS_DEFINED)
         {
@@ -332,52 +335,64 @@ void processCommand(char** tokens) {
 
         int new_pid = atoi(tokens[1]);
         // Check for valid PID range
-        if (new_pid >= 0 && new_pid < MAX_PROCESSES) {
+        if (new_pid >= 0 && new_pid < MAX_PROCESSES)
+        {
             contextSwitch(new_pid);
-        } else {
+        }
+        else
+        {
             // Output an error message for invalid PID
             fprintf(output_file, "Current PID: %d. Invalid context switch to process %d\n", CURRENT_PID, new_pid);
         }
     }
 
-
-    else if (tokens[0] && strcmp(tokens[0], "load") == 0) {
+    else if (tokens[0] && strcmp(tokens[0], "load") == 0)
+    {
         static int error_reported = FALSE;
 
-        if (!IS_DEFINED) {
-            if (!error_reported) {
+        if (!IS_DEFINED)
+        {
+            if (!error_reported)
+            {
                 fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
                 error_reported = TRUE;
             }
             return;
         }
 
-        if (tokens[1] && tokens[2]) {
-            char* dst = tokens[1];
-            char* src = tokens[2];
-            
-            if (!isValidRegister(dst)) {
+        if (tokens[1] && tokens[2])
+        {
+            char *dst = tokens[1];
+            char *src = tokens[2];
+
+            if (!isValidRegister(dst))
+            {
                 fprintf(output_file, "Current PID: %d. Error: invalid register operand %s\n", CURRENT_PID, dst);
                 return;
             }
 
             int regIndex = atoi(dst + 1);
 
-            if (src[0] == '#') { // Immediate value
+            if (src[0] == '#')
+            { // Immediate value
                 int value = atoi(src + 1);
                 registers[regIndex] = value;
                 fprintf(output_file, "Current PID: %d. Loaded immediate %s into register %s\n", CURRENT_PID, src + 1, dst);
-            } else { // Load from memory address
-                int virtualAddr = atoi(src); 
+            }
+            else
+            { // Load from memory address
+                int virtualAddr = atoi(src);
                 int physicalAddr = translateAddress(virtualAddr);
 
                 // Check for translation failure
-                if (physicalAddr == -2) {
+                if (physicalAddr == -2)
+                {
                     // Translation failure, but not a page fault. Stop further processing.
                     return;
                 }
 
-                if (physicalAddr == -1) {
+                if (physicalAddr == -1)
+                {
                     // Page fault. Log and stop further processing.
                     fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
                     return;
@@ -387,13 +402,17 @@ void processCommand(char** tokens) {
                 registers[regIndex] = physicalMemory[physicalAddr];
                 fprintf(output_file, "Current PID: %d. Loaded value of location %d (%d) into register %s\n", CURRENT_PID, virtualAddr, physicalMemory[physicalAddr], dst);
             }
-        } else {
+        }
+        else
+        {
             fprintf(output_file, "Error: 'load' command requires a destination and a source operand.\n");
         }
     }
 
-   else if (tokens[0] && strcmp(tokens[0], "add") == 0) {
-        if (!IS_DEFINED) {
+    else if (tokens[0] && strcmp(tokens[0], "add") == 0)
+    {
+        if (!IS_DEFINED)
+        {
             fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
             return;
         }
@@ -447,12 +466,15 @@ void processCommand(char** tokens) {
         }
 
         int VPN = atoi(tokens[1]);
-        if (VPN >= 0 && VPN < pow(2, VPN_BITS)) {
+        if (VPN >= 0 && VPN < pow(2, VPN_BITS))
+        {
 
-            for (int i = 0; i < TLB_SIZE; i++) {
+            for (int i = 0; i < TLB_SIZE; i++)
+            {
 
-                if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID) {
-                    
+                if (tlb[i].validBit && tlb[i].VPN == VPN && tlb[i].pid == CURRENT_PID)
+                {
+
                     tlb[i].validBit = 0; // Invalidate TLB entry
                 }
             }
@@ -474,51 +496,70 @@ void processCommand(char** tokens) {
         // Other commands should be implemented similarly
     }
 
-    else if (tokens[0] && strcmp(tokens[0], "rinspect") == 0) {
-        if (tokens[1]) {
-            if (!isValidRegister(tokens[1])) {
+    else if (tokens[0] && strcmp(tokens[0], "rinspect") == 0)
+    {
+        if (tokens[1])
+        {
+            if (!isValidRegister(tokens[1]))
+            {
                 fprintf(output_file, "Current PID: %d. Error: invalid register operand %s\n", CURRENT_PID, tokens[1]);
                 return;
             }
 
             int regIndex = atoi(tokens[1] + 1); // Assuming 'rX' format
-            if (regIndex >= 0 && regIndex < MAX_REGISTERS) {
+            if (regIndex >= 0 && regIndex < MAX_REGISTERS)
+            {
                 fprintf(output_file, "Current PID: %d. Inspected register %s. Content: %d\n", CURRENT_PID, tokens[1], registers[regIndex]);
-            } else {
+            }
+            else
+            {
                 fprintf(output_file, "Current PID: %d. Error: invalid register index %d\n", CURRENT_PID, regIndex);
             }
-        } else {
+        }
+        else
+        {
             fprintf(output_file, "Error: 'rinspect' command requires a register operand.\n");
         }
     }
 
-    else if (tokens[0] && strcmp(tokens[0], "pinspect") == 0) {
-        if (!IS_DEFINED) {
+    else if (tokens[0] && strcmp(tokens[0], "pinspect") == 0)
+    {
+        if (!IS_DEFINED)
+        {
             fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
             return;
         }
 
-        if (tokens[1]) {
+        if (tokens[1])
+        {
             int VPN = atoi(tokens[1]);
-            if (VPN >= 0 && VPN < pow(2, VPN_BITS)) {
+            if (VPN >= 0 && VPN < pow(2, VPN_BITS))
+            {
                 PageTableEntry entry = pageTables[CURRENT_PID][VPN];
-                fprintf(output_file, "Current PID: %d. Inspected page table entry %d. Physical frame number: %d. Valid: %d\n", 
+                fprintf(output_file, "Current PID: %d. Inspected page table entry %d. Physical frame number: %d. Valid: %d\n",
                         CURRENT_PID, VPN, entry.PFN, entry.validBit);
-            } else {
+            }
+            else
+            {
                 fprintf(output_file, "Current PID: %d. Error: Invalid VPN %d\n", CURRENT_PID, VPN);
             }
-        } else {
+        }
+        else
+        {
             fprintf(output_file, "Error: 'pinspect' command requires a virtual page number.\n");
         }
     }
 
-    else if (tokens[0] && strcmp(tokens[0], "store") == 0) {
-        if (!IS_DEFINED) {
+    else if (tokens[0] && strcmp(tokens[0], "store") == 0)
+    {
+        if (!IS_DEFINED)
+        {
             fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
             return;
         }
 
-        if (!tokens[1] || !tokens[2]) {
+        if (!tokens[1] || !tokens[2])
+        {
             fprintf(output_file, "Error: 'store' command requires both a virtual address and a value.\n");
             return;
         }
@@ -526,73 +567,98 @@ void processCommand(char** tokens) {
         int virtualAddr = atoi(tokens[1]);
         int valueToStore;
 
-        if (tokens[2][0] == '#') {
+        if (tokens[2][0] == '#')
+        {
             valueToStore = atoi(tokens[2] + 1); // Immediate value
             // Store immediate value
             int physicalAddr = translateAddress(virtualAddr);
-            if (physicalAddr != -1) {
+            if (physicalAddr != -1)
+            {
                 physicalMemory[physicalAddr] = valueToStore;
-                fprintf(output_file, "Current PID: %d. Stored immediate %d into location %d\n", 
+                fprintf(output_file, "Current PID: %d. Stored immediate %d into location %d\n",
                         CURRENT_PID, valueToStore, virtualAddr);
-            } 
-            else {
+            }
+            else
+            {
                 fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
             }
-        } else if (isValidRegister(tokens[2])) {
+        }
+        else if (isValidRegister(tokens[2]))
+        {
             int regIndex = atoi(tokens[2] + 1);
             valueToStore = registers[regIndex]; // Value from register
             // Store value from register
             int physicalAddr = translateAddress(virtualAddr);
-            if (physicalAddr != -1) {
+            if (physicalAddr != -1)
+            {
                 physicalMemory[physicalAddr] = valueToStore;
-                fprintf(output_file, "Current PID: %d. Stored value of register %s (%d) into location %d\n", 
+                fprintf(output_file, "Current PID: %d. Stored value of register %s (%d) into location %d\n",
                         CURRENT_PID, tokens[2], valueToStore, virtualAddr);
-            } else {
+            }
+            else
+            {
                 fprintf(output_file, "Current PID: %d. Page fault at virtual address %d\n", CURRENT_PID, virtualAddr);
             }
-        } else {
+        }
+        else
+        {
             fprintf(output_file, "Current PID: %d. Error: invalid operand for store %s\n", CURRENT_PID, tokens[2]);
             return;
         }
     }
 
-    else if (tokens[0] && strcmp(tokens[0], "linspect") == 0) {
-        if (!IS_DEFINED) {
+    else if (tokens[0] && strcmp(tokens[0], "linspect") == 0)
+    {
+        if (!IS_DEFINED)
+        {
             fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
             return;
         }
 
-        if (tokens[1]) {
+        if (tokens[1])
+        {
             int physicalAddr = atoi(tokens[1]);
 
-            if (physicalAddr >= 0 && physicalAddr < pow(2, OFFSET_BITS + PFN_BITS)) {
+            if (physicalAddr >= 0 && physicalAddr < pow(2, OFFSET_BITS + PFN_BITS))
+            {
                 int value = physicalMemory[physicalAddr];
                 fprintf(output_file, "Current PID: %d. Inspected physical location %d. Value: %d\n", CURRENT_PID, physicalAddr, value);
-            } else {
+            }
+            else
+            {
                 fprintf(output_file, "Error: Invalid physical memory address %d\n", physicalAddr);
             }
-        } 
-        else {
+        }
+        else
+        {
             fprintf(output_file, "Error: 'linspect' command requires a physical memory address.\n");
         }
     }
 
-    else if (tokens[0] && strcmp(tokens[0], "tinspect") == 0) {
-        if (!IS_DEFINED) {
+    else if (tokens[0] && strcmp(tokens[0], "tinspect") == 0)
+    {
+        if (!IS_DEFINED)
+        {
             fprintf(output_file, "Current PID: %d. Error: attempt to execute instruction before define\n", CURRENT_PID);
             return;
         }
 
-        if (tokens[1]) {
+        if (tokens[1])
+        {
             int tlbIndex = atoi(tokens[1]);
-            if (tlbIndex >= 0 && tlbIndex < TLB_SIZE) {
+            if (tlbIndex >= 0 && tlbIndex < TLB_SIZE)
+            {
                 TLBEntry entry = tlb[tlbIndex];
                 fprintf(output_file, "Current PID: %d. Inspected TLB entry %d. VPN: %d. PFN: %d. Valid: %d. PID: %d. Timestamp: %u\n",
                         CURRENT_PID, tlbIndex, entry.VPN, entry.PFN, entry.validBit, entry.pid, entry.timestamp);
-            } else {
+            }
+            else
+            {
                 fprintf(output_file, "Error: Invalid TLB entry index %d\n", tlbIndex);
             }
-        } else {
+        }
+        else
+        {
             fprintf(output_file, "Error: 'tinspect' command requires a TLB entry index.\n");
         }
     }
